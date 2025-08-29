@@ -1,0 +1,2044 @@
+;|
+GDD Grading and Drainage Designer
+
+Defaults are in the GDD-GETVAR function for now.
+
+Inserts a connecting slope (or rise) between two point blocks.
+Adjusts elevation points and connecting slopes or rises.
+
+GDDPOINT.DWG is an attributed block.  It represents an elevation point.
+It has the following attributes:
+  -ELEV is the current elevation of the point in display format.
+   The Z coordinate is the true current elevation.
+  -PREFELEV is the preferred elevation for the point.
+   During automatic adjustments, this elevation is
+   used in the absence of other constraints or as
+   a starting point.
+   Preferred connection values have priority over
+   preferred elevation values.
+  -MINELEV is the minimum allowable elevation for the point.
+   During automatic adjustments, this constraint is not violated.
+   A report is given if the adjustment has to stop because of this constraint.
+  -MAXELEV is the maximum allowable elevation for the point.
+   During automatic adjustments, this constraint is not violated.
+   A report is given if the adjustment has to stop because of this constraint.
+
+GDDCONNECT.DWG is an attributed block.  It represents a connection between two points.
+It has the following attributes:
+  -VALUE is the current value value of the connection.
+  -TYPE is the connection type, either SLOPE or RISE.
+  -PREFVAL is the preferred value for the connection.
+   During automatic adjustments, this value is
+   used unless user gives permission to adjust it.
+   Preferred connection values have priority over
+   preferred elevation values.
+  -MINVAL is the minimum allowable value for the connection.
+   During automatic adjustments, this constraint is not violated.
+   A report is given if the adjustment has to stop because of this constraint.
+  -MAXVAL is the maximum allowable value for the connection.
+   During automatic adjustments, this constraint is not violated.
+   A report is given if the adjustment has to stop because of this constraint.
+  -PREFIX
+  -SUFFIX
+  -FACTOR
+  -X1
+  -Y1
+  -Z1
+  -HANDLE1
+  -X2
+  -Y2
+  -Z2
+  -HANDLE2
+  -BULGE is the ratio of
+   the distance from the midpoint of an arc connector to the midpoint of the chord
+   to
+   half the chord length.
+   delta = 4 * atan(bulge)
+   radius = chord length / sin(delta / 2) / 2
+
+
+Data structures:
+
+  Entities are passed among functions as entity names
+  Points connected are stored in connectors as handles
+
+             <= Counter-clockwise is mathematically positive
+        ooo  
+     o       PNT3    
+   o        /| o    
+  o        / |  PNT2 
+ o        /  |   o  
+ o       +   |-b-o  
+  o       \  C  o   
+   o       \ | o    
+     o      \PNT1    
+        ooo
+         <= Clockwise is mathematically negative
+
+  Bulge is 2B/C where C is the arc chord.  The arc shown has a positive (rightward) bulge).
+  Bulge also = tan (delta / 4)
+  Bulge is 0 for a line, 1 for a 180 degree arc, and approaches infinity as delta approaches 360.
+
+Assumptions:
+  Current angular units are degrees (see GDD-INSBLK function).
+
+|;
+
+;;;  Menu state settings
+(DEFUN
+   GDD-MENUINIT  ()
+  ;;Put a check mark on "Prompt for connector placement" menu item if needed.
+  (COND
+    ((/= (GDD-GETVAR "CONNECTORUSERPLACE") "0")
+     (MENUCMD "GGDD.ID_GDDCPTOG=!.")
+    )
+  )
+  ;;Put a check mark on the "Prompt for descriptions" menu item if needed.
+  (COND
+    ((= (GDD-GETVAR "CONNECTORUSERPLACE") "On")
+     (MENUCMD "GGDD.ID_GDDPDTOG=!.")
+    )
+  )
+  ;;Remove check mark on enable z coordinate on move point since that's our default on load.
+  (COND
+    ((= (GDD-GETVAR "CONNECTORUSERPLACE") "On")
+     (MENUCMD "GGDD.ID_GDDPMZTOG=!.")
+    )
+  )
+)
+
+
+;;;  Command functions ----------------------------------------------------------
+;;;  C:GDDMENU Reloads GDD.MNU using the menuload command
+(DEFUN C:GDDMENU () (COMMAND "._menuunload" "gdd" "._menuload" "gdd.mnu"))
+
+;;;  C:GDD-AVERAGEELEVATION prompts for average project elevation
+(DEFUN C:GDD-AVERAGEELEVATION () (GDD-SETUP "Average"))
+
+;;;  C:GDD-DISPLAYDIGITS prompts for number of display digits
+(DEFUN C:GDD-DISPLAYDIGITS () (GDD-SETUP "Digits"))
+
+;;;  C:GDD-CURVEERROR prompts for the allowed curve segmenting error
+(DEFUN C:GDD-CURVEERROR () (GDD-SETUP "Error"))
+
+;;;  C:GDD-CURBHEIGHT prompts for the current curb height
+(DEFUN C:GDD-CURBHEIGHT () (GDD-SETUP "Curb"))
+
+;;;  C:GDD-PLACEMENTPROMPTMAX prompts for the maximum number of connectors to individually manually place.
+(DEFUN C:GDD-PLACEMENTPROMPTMAX () (GDD-SETUP "Connector") (PRINC))
+
+;;;  C:GDD-PLACEMENTPROMPTTOGGLE toggles whether connector placement is manual or always automatic
+(DEFUN
+   C:GDD-PLACEMENTPROMPTTOGGLE ()
+  (COND
+    ((= (GDD-GETVAR "CONNECTORUSERPLACE") "0")
+     (GDD-SETVAR "CONNECTORUSERPLACE" (GDD-GETVAR "CONNECTORUSERPLACEMAX"))
+     (MENUCMD "GGDD.ID_GDDCPTOG=!.")
+    )
+    (T (GDD-SETVAR "CONNECTORUSERPLACE" "0") (MENUCMD "GGDD.ID_GDDCPTOG="))
+  )
+  (PRINC)
+)
+
+;;;  C:GDD-DESCRIPTIONS prompts for current point descriptions
+(DEFUN
+   C:GDD-DESCRIPTIONS ()
+  (GDD-GETDESCRIPTION "1")
+  (GDD-GETDESCRIPTION "2")
+  (PRINC)
+)
+
+;;;  C:GDD-DESCRIPTIONPROMPTTOGGLE toggles whether descriptions are requested on point insertion
+(DEFUN
+   C:GDD-DESCRIPTIONPROMPTTOGGLE ()
+  (COND
+    ((= (GDD-GETVAR "POINTDESCRIPTIONPROMPT") "On")
+     (GDD-SETVAR "POINTDESCRIPTIONPROMPT" "Off")
+     (MENUCMD "GGDD.ID_GDDPDTOG=")
+    )
+    (T
+     (GDD-SETVAR "POINTDESCRIPTIONPROMPT" "On")
+     (MENUCMD "GGDD.ID_GDDPDTOG=!.")
+    )
+  )
+  (PRINC)
+)
+
+;;;  C:GDD-ZMOVETOGGLE toggles whether Z coordinate is heeded when moving points
+(DEFUN
+   C:GDD-ZMOVETOGGLE ()
+  (COND
+    ((= (GDD-GETVAR "POINTMOVEZ") "Off")
+     (GDD-SETVAR "POINTMOVEZ" "On")
+     (MENUCMD "GGDD.ID_GDDPMZTOG=!.")
+    )
+    (T (GDD-SETVAR "POINTMOVEZ" "Off") (MENUCMD "GGDD.ID_GDDPMZTOG="))
+  )
+  (PRINC)
+)
+
+;;;  C:GDD-INSERTPOINTSINGLE
+(DEFUN C:RANDOMSPOT () (C:GDD-INSERTPOINTSINGLE))
+(DEFUN C:IP () (C:GDD-INSERTPOINTSINGLE))
+(DEFUN C:IPS () (C:GDD-INSERTPOINTSINGLE))
+(DEFUN
+   C:GDD-INSERTPOINTSINGLE (/ ANG1 DESC INPUT1 INPUTDEST INPUTREF)
+  ;;Get elevation or reference point from user.
+  (SETQ INPUTREF (GDD-GETREFERENCE "point"))
+  ;;Prompt for point description.  Get default from and save as description id "1".
+  (SETQ
+    DESC
+     (IF (= (GDD-GETVAR "POINTDESCRIPTIONPROMPT") "On")
+       (GDD-GETDESCRIPTION "1")
+       (GDD-GETVAR "DESCRIPTION1")
+     )
+  )
+  ;;Get insertion point and connector arc second point if any.
+  (SETQ INPUTDEST (GDD-GETDESTINATION INPUTREF))
+  ;;Insert point.
+  (GDD-INSERTPOINT INPUTREF INPUTDEST (LIST (LIST DESC 0.0 "gddpoint-single")))
+  (PRINC)
+)
+
+;;;  C:GDD-INSERTPOINTDOUBLE
+(DEFUN C:IPD () (C:GDD-INSERTPOINTDOUBLE))
+(DEFUN
+   C:GDD-INSERTPOINTDOUBLE (/ ANG1 DESC1 DESC2 INPUT1 INPUTDEST INPUTREF)
+  ;;Get elevation or reference point from user.
+  (SETQ INPUTREF (GDD-GETREFERENCE "point"))
+  ;;Prompt for point description.  Get default from and save as description id "1".
+  (SETQ
+    DESC1
+     (IF (= (GDD-GETVAR "POINTDESCRIPTIONPROMPT") "On")
+       (GDD-GETDESCRIPTION "1")
+       (GDD-GETVAR "DESCRIPTION1")
+     )
+  )
+  ;;Prompt for point description.  Get default from and save as description id "2".
+  (SETQ
+    DESC2
+     (IF (= (GDD-GETVAR "POINTDESCRIPTIONPROMPT") "On")
+       (GDD-GETDESCRIPTION "2")
+       (GDD-GETVAR "DESCRIPTION2")
+     )
+  )
+  ;;Get insertion point and connector arc second point if any.
+  (SETQ INPUTDEST (GDD-GETDESTINATION INPUTREF))
+  ;;Insert points (upper and lower).
+  (GDD-INSERTPOINT
+    INPUTREF
+    INPUTDEST
+    (LIST
+      (LIST DESC1 0.0 "gddpoint-lower")
+      (LIST
+  DESC2
+  ;;ATOF = ALPHABET TO FLOAT (STRING TO REAL)
+  (ATOF (GDD-GETVAR "CURBHEIGHT"))
+  "gddpoint-upper"
+      )
+    )
+  )
+  (PRINC)
+)
+
+;;;  C:GDD-RAISEPOINTS
+(DEFUN C:RP () (C:GDD-RAISEPOINTS))
+(DEFUN
+   C:GDD-RAISEPOINTS (/ SSPOINTS INCREMENT)
+  (SETQ
+    SSPOINTS
+     (SSGET '((0 . "INSERT") (2 . "GDDPOINT*")))
+    INCREMENT
+     (GETREAL "\nAmount to raise each point:  ")
+  )
+  (GDD-UPDATE SSPOINTS (LIST 0.0 0.0 INCREMENT))
+)
+
+;;;  C:GDD-MOVEPOINTS
+(DEFUN C:MP () (C:GDD-MOVEPOINTS))
+(DEFUN
+   C:GDD-MOVEPOINTS (/ DISPLACEMENT SSPOINTS PNT1 PNT2)
+  (SETQ
+    SSPOINTS
+     (SSGET '((0 . "INSERT") (2 . "GDDPOINT*")))
+    PNT1
+     (GETPOINT "\nSpecify base point or [Displacement] <Displacement>: ")
+  )
+  (IF (NOT PNT1)
+    (SETQ PNT2 (GETPOINT "\nSpecify displacement <0.00, 0.00, 0.00>: "))
+    (SETQ
+      PNT2
+       (GETPOINT
+   PNT1
+   "\nSpecify second point or <use first point as displacement>: "
+       )
+    )
+  )
+  (SETQ
+    DISPLACEMENT
+     (IF (NOT PNT2)
+       PNT1
+       (IF (NOT PNT1)
+   PNT2
+   (LIST
+     (- (CAR PNT2) (CAR PNT1))
+     (- (CADR PNT2) (CADR PNT1))
+     (- (CADDR PNT2) (CADDR PNT1))
+   )
+       )
+     )
+  )
+  (IF (= (GDD-GETVAR "POINTMOVEZ") "Off")
+    (SETQ DISPLACEMENT (LIST (CAR DISPLACEMENT) (CADR DISPLACEMENT) 0.0))
+  )
+  (GDD-UPDATE SSPOINTS DISPLACEMENT)
+)
+
+;;;  C:GDD-INSERTCONNECTOR
+(DEFUN C:IC () (C:GDD-INSERTCONNECTOR))
+(DEFUN
+   C:GDD-INSERTCONNECTOR (/ CTYPE ENPNT1 ENPNT3 ARCPNT2 PNT2D1 PNT2D3)
+  (SETQ
+    ENPNT1
+     (CAR (ENTSEL "\nSelect 3d point object: "))
+    CTYPE "SLOPE"
+  )
+  (WHILE (NOT ENPNT3)
+    (INITGET "Arc Rise")
+    (SETQ
+      ENPNT3
+       (ENTSEL "\nSelect second 3d point object or [Arc/Rise] <Arc>: ")
+    )
+    (COND
+      ((OR (NOT ENPNT3) (= ENPNT3 "Arc"))
+       (SETQ
+   ARCPNT2
+    (GETPOINT "\nSelect second point on arc between points: ")
+   ENPNT3  NIL
+       )
+      )
+      ((= ENPNT3 "Rise")
+       (SETQ
+   CTYPE "RISE"
+   ENPNT3  NIL
+       )
+       (PROMPT "\nConnector type = RISE")
+      )
+      (T (SETQ ENPNT3 (CAR ENPNT3)))
+    )
+  )
+  (GDD-INSERTCONNECTOR
+    CTYPE
+    ENPNT1
+    ENPNT3
+    (IF  ARCPNT2
+      (GDD-3PTTOBULGE
+  (CDR (ASSOC 10 (ENTGET ENPNT1)))
+  ARCPNT2
+  (CDR (ASSOC 10 (ENTGET ENPNT3)))
+      )
+      0
+    )
+    (IF  (/= (GDD-GETVAR "CONNECTORUSERPLACE") "0")
+      T
+      NIL
+    )
+  )
+  (PRINC)
+)
+
+;;;  C:GDD-EDITSLOPE
+(DEFUN
+   C:EDITSLOPE (/ ADJUSTMENT BULGE ENCONNECTOR ENPNT1 ENPNT3 ENPOINT
+    HOLDINGLOWESTPOINT MOVINGPNT1 MOVINGPNT3 NEWSLOPE PNT1HIGHEST
+    PNT3D1 PNT3D3 READLIST SSPOINTS
+         )
+  ;;Get the new slope to use
+  (SETQ
+    NEWSLOPE
+     (GDD-SETFROMINPUT
+       'GETREAL
+       'REAL
+       "New slope to set (negative to reverse direction)"
+       "OBJECTSLOPE"
+     )
+  )
+  ;;In a loop, prompt repeatedly for a connector to change, then the points to adjust.
+  (WHILE (SETQ ENCONNECTOR (CAR (ENTSEL "\nSelect slope to edit: ")))
+    (PROMPT "\nSelect points to adjust: ")
+    (SETQ SSPOINTS (SSGET '((0 . "INSERT") (2 . "GDDPOINT*"))))
+    ;;Read about the connector.
+    (SETQ
+      READLIST
+       (GDD-READBLOCK
+   ENCONNECTOR
+   '(("HANDLEPOINT1") ("HANDLEPOINT2") ("BULGE"))
+       )
+      ENPNT1
+       (HANDENT (CDR (ASSOC "HANDLEPOINT1" READLIST)))
+      ENPNT3
+       (HANDENT (CDR (ASSOC "HANDLEPOINT2" READLIST)))
+      BULGE
+       (ATOF (CDR (ASSOC "BULGE" READLIST)))
+      MOVINGPNT1
+       (SSMEMB ENPNT1 SSPOINTS)
+      MOVINGPNT3
+       (SSMEMB ENPNT3 SSPOINTS)
+    )
+    ;;Check that user didn't select to adjust both ends of slope.  (How embarrasing!)
+    (WHILE (AND MOVINGPNT1 MOVINGPNT3)
+      (ALERT
+  (PRINC
+    "\nCan't adjust both ends of a slope at once.\n\nPlease select an end to hold."
+  )
+      )
+      (IF (SETQ ENPOINT (CAR (ENTSEL)))
+  (SSDEL ENPOINT SSPOINTS)
+      )
+    )
+    ;;Calculate the adjustment required for the slope change.
+    ;;Adjustment if lowest point is held = length * (newslope - oldslope)
+    ;;Adjustment if highest point is held = -1 * the above
+    (SETQ
+      PNT3D1
+       (CDR (ASSOC 10 (ENTGET ENPNT1)))
+      PNT3D3
+       (CDR (ASSOC 10 (ENTGET ENPNT3)))
+      PNT1HIGHEST
+       (> (CADDR PNT3D1) (CADDR PNT3D3))
+      HOLDINGLOWESTPOINT
+       (IF PNT1HIGHEST
+   MOVINGPNT1
+   MOVINGPNT3
+       )
+      ADJUSTMENT
+       (* (IF HOLDINGLOWESTPOINT
+      1
+      -1
+    )
+    (GDD-SEGMENT-LENGTH PNT3D1 PNT3D3 BULGE)
+    (- (ATOF (GDD-GETVAR "OBJECTSLOPE"))
+       (ABS (GDD-SLOPE PNT3D1 PNT3D3 BULGE))
+    )
+       )
+    )
+    (GDD-UPDATE SSPOINTS (LIST 0.0 0.0 ADJUSTMENT))
+  )
+)
+
+
+;;;  GDD-UPDATE
+(DEFUN C:UP () (C:GDD-UPDATE))
+(DEFUN
+   C:GDD-UPDATE  ()
+  (GDD-UPDATE
+    (SSGET '((0 . "INSERT") (2 . "GDDPOINT*,GDDCONNECT")))
+    '(0.0 0.0 0.0)
+  )
+)
+;;;----------------------------------------------------------------------------
+;;;  End command functions------------------------------------------------------
+;;;----------------------------------------------------------------------------
+;;;  Point block functions ----------------------------------------------------------
+;;;----------------------------------------------------------------------------
+
+;;;  GDD-INSERTPOINT
+(DEFUN
+   GDD-INSERTPOINT (INPUTREF INPUTDEST POINTLIST / ANG1  ARCPNT2  BLOCKNAME BULGE
+        DESC DISPLAYELEV FULLELEV PNT2D1 PNT2D3 PNT3D1 VERTADJUST
+       )
+;;;
+;;;  ARGUMENTS:
+;;;INPUTREF=XYZ POINT OR AN OBJECT
+;;;INPUTDEST=A 2 ELEMENT LIST CONTAINING 2ND ARC POINT AND INSERTION POINT
+;;;POINTLIST='(( DESC1 VERTADJUST1 BLOCKNAME1)...(DESCI VERTADJUSTI BLOCKNAMEI))
+;;;    THE FIRST ELEMENT IS THE BLOCK THAT THE CONNECTOR WILL TIE TO
+;;;*** DOW NOTE TO SELF - ITH ONE IS A COUNTER ***
+;;;  Inserts a point block at each point in POINTLIST
+;;;  If getting elevation from a reference object, draws 3d line work.
+;;;  If also slope isn't zero, adds a slope label and arrow block.
+  ;;If inputref is an object, get full elevation from its z coordinate.
+  ;;Otherwise from input.
+  (COND
+    ((= (TYPE INPUTREF) 'ENAME)
+     (SETQ PNT3D1 (CDR (ASSOC 10 (ENTGET INPUTREF))))
+     ;; If inputdest contains two lists,
+     ;; the first one is the second point of a connector arc,
+     ;; and the second one is the destination point,
+     (IF (= (TYPE (CAR INPUTDEST)) 'LIST)
+       (SETQ
+   ARCPNT2
+    (GDD-FLATTEN (CAR INPUTDEST))
+   PNT2D3
+    (GDD-FLATTEN (CADR INPUTDEST))
+       )
+       (SETQ PNT2D3 INPUTDEST)
+     )
+     ;; Calculate the elevation of the destination point
+     (SETQ
+       PNT2D1
+  (GDD-FLATTEN PNT3D1)
+       BULGE
+  (IF ARCPNT2
+    (GDD-3PTTOBULGE PNT2D1 ARCPNT2 PNT2D3)
+    0
+  )
+       FULLELEV
+  (+ (CADDR PNT3D1)
+     (ATOF (GDD-GETVAR "OBJECTADD"))
+     (* (ATOF (GDD-GETVAR "OBJECTSLOPE"))
+        (GDD-SEGMENT-LENGTH PNT2D1 PNT2D3 BULGE)
+     )
+  )
+     )
+    )
+    (T
+     (SETQ
+       FULLELEV
+  (+ INPUTREF)
+       PNT2D3 INPUTDEST
+     )
+    )
+  )
+  (SETQ ANG1 (GETANGLE PNT2D3 "\nRotation: "))
+;;;STEP THRU EACH POINT 
+  (FOREACH
+     POINTI (REVERSE POINTLIST)
+    (SETQ
+      DESC
+       (CAR POINTI)
+      VERTADJUST
+       (CADR POINTI)
+      BLOCKNAME
+       (CADDR POINTI)
+      DISPLAYELEV
+       (GDD-SHORTELEV (RTOS (+ FULLELEV VERTADJUST) 2))
+    )
+    (GDD-INSBLK
+      BLOCKNAME
+      (LIST (CAR PNT2D3) (CADR PNT2D3) (+ FULLELEV VERTADJUST))
+      ANG1
+      (GDD-GETVAR "LYRPOINT")
+      1
+    )
+    (GDD-WRITEBLOCK
+      (ENTLAST)
+      (LIST
+  (CONS "DESC" DESC)
+  (CONS "ELEV" DISPLAYELEV)
+  (CONS "PREFELEV" DISPLAYELEV)
+  (CONS "MINELEV" DISPLAYELEV)
+  (CONS "MAXELEV" DISPLAYELEV)
+      )
+    )
+  )
+  (COND
+    ((= (TYPE INPUTREF) 'ENAME)
+     (GDD-INSERTCONNECTOR
+       ;;Type of connector
+       (IF (= 0 (ATOF (GDD-GETVAR "OBJECTSLOPE")))
+   "RISE"
+   "SLOPE"
+       )
+       ;;What to connect to
+       INPUTREF
+       ;;Entlast is the last point in the reversed list
+       (ENTLAST)
+       BULGE
+       (IF (/= (GDD-GETVAR "CONNECTORUSERPLACE") "0")
+   T
+   NIL
+       )
+     )
+    )
+  )
+)
+
+;;;  GDD-INSBLK Inserts a given block at a given point
+(DEFUN
+   GDD-INSBLK (BLNAME INSPNT ROTATION LAYER OPTIONS / BLSCALE)
+;;;at dimscale * dimtxt
+;;;on layer given
+;;;Assumes that the current angular units are degrees.
+;;;Options:
+;;;1 Add "lt" or "rt" to block name depending on rotation.
+  (SETQ BLSCALE (* (GETVAR "dimscale") (GETVAR "dimtxt")))
+  (GDD-MAKELAYER LAYER)
+  (COMMAND
+    "._insert"
+    (IF  (= 1 (LOGAND OPTIONS 1))
+      (STRCAT
+  BLNAME
+  (IF (MINUSP (COS ROTATION))
+    "lt"
+    "rt"
+  )
+      )
+      BLNAME
+    )
+    INSPNT
+    BLSCALE
+    ""
+    (IF  (= ROTATION "P")
+      PAUSE
+      (/ (* ROTATION 180) PI)
+    )
+  )
+)
+
+;;;  GDD-GETDESCRIPTION
+(DEFUN
+   GDD-GETDESCRIPTION (IDSTR / INPUTSTR CURRENTDESC)
+;;;Gets a point description from user, prompting with current default.
+  (GDD-SETFROMINPUT
+    'GETSTRING
+    'STR
+    (STRCAT "Description " IDSTR)
+    (STRCAT "DESCRIPTION" IDSTR)
+  )
+)
+
+;;;  Connector functions ---------------------------------------------------------
+
+;;;  GDD-INSERTCONNECTOR
+(DEFUN
+   GDD-INSERTCONNECTOR (CTYPE ENPNT1 ENPNT3 BULGE PLACEMENTPROMPT / CENPNT
+      EN3DLINE ENARROW ENCONNECT INSPNT PNT2D1 PNT2D3  PNT3D1
+      PNT3D3 PNTTEMP SLOPEDIR  SS1 VALUE
+           )
+;;;  Inserts a connector of a given type at a given point
+;;;  between two given point blocks with a given bulge
+;;;  (positive bulge is counterclockwise)
+;;;  If the connector is a SLOPE, inserts graphics.
+;;;  Places direction arrow
+;;;  between block and connector pointing downslope.
+;;;  Orients block "right side up"
+  (SETQ
+    PNT3D1
+     (CDR (ASSOC 10 (ENTGET ENPNT1)))
+    PNT3D3
+     (CDR (ASSOC 10 (ENTGET ENPNT3)))
+    PNT2D1
+     (GDD-FLATTEN PNT3D1)
+    PNT2D3
+     (GDD-FLATTEN PNT3D3)
+  )
+  ;; Add 3d line
+  (GDD-MAKELAYER (GDD-GETVAR "LYR3DLINE"))
+  (SETQ EN3DLINE (GDD-DRAW3DLINE PNT3D1 PNT3D3 BULGE))
+  ;;Add connector block
+  (SETQ
+    INSPNT
+     (GDD-SEGMENT-MIDPOINT PNT2D1 PNT2D3 BULGE)
+    CENPNT
+     (GDD-SEGMENT-CENTER PNT2D1 PNT2D3 BULGE)
+    SLOPEDIR
+     (GDD-SLOPEDIR INSPNT PNT3D1 PNT3D3 BULGE)
+    VALUE
+     (STRCAT
+       (GDD-GETVAR "CONNECTPREFIX")
+       (RTOS
+   (* (ABS (GDD-SLOPE PNT3D1 PNT3D3 BULGE))
+      (ATOF (GDD-GETVAR "CONNECTFACTOR"))
+   )
+   2
+   (ATOI (GDD-GETVAR "CONNECTPREC"))
+       )
+       (GDD-GETVAR "CONNECTSUFFIX")
+     )
+    SS1
+     (SSADD)
+  )
+  (GDD-INSBLK
+    "gddconnect"
+    INSPNT
+    (GDD-RIGHTSIDEUP SLOPEDIR)
+    (GDD-GETVAR
+      (IF (= CTYPE "SLOPE")
+  "LYRCONNECTSLOPE"
+  "LYRCONNECTRISE"
+      )
+    )
+    0
+  )
+  (SETQ SS1 (SSADD (ENTLAST) SS1))
+  (GDD-WRITEBLOCK
+    (ENTLAST)
+    (LIST
+      (CONS "TYPE" CTYPE)
+      (CONS "VALUE" "")
+      (CONS "PREFVAL" VALUE)
+      (CONS "MINVAL" VALUE)
+      (CONS "MAXVAL" VALUE)
+      ;;      (CONS "PREFIX" (GDD-GETVAR "CONNECTPREFIX"))
+      ;;      (CONS "SUFFIX" (GDD-GETvAR "CONNECTSUFFIX"))
+      ;;      (CONS "FACTOR" (GDD-GETVAR "CONNECTFACTOR"))
+      (CONS "HANDLEPOINT1" (CDR (ASSOC 5 (ENTGET ENPNT1))))
+      (CONS "HANDLEPOINT2" (CDR (ASSOC 5 (ENTGET ENPNT3))))
+      (CONS "HANDLE3DLINE" (CDR (ASSOC 5 (ENTGET EN3DLINE))))
+      (CONS "BULGE" (RTOS BULGE 2 16))
+      (CONS "CHORD" (RTOS (DISTANCE PNT2D1 PNT2D3) 2 16))
+    )
+  )
+  (SETQ ENCONNECT (ENTLAST))
+  ;; If connector type is slope, add graphics to drawing.
+  (COND
+    ((= CTYPE "SLOPE")
+     (GDD-INSBLK "gddarrow" INSPNT SLOPEDIR (GDD-GETVAR "LYRARROW") 0)
+     (SETQ ENARROW (ENTLAST))
+     (SETQ SS1 (SSADD (ENTLAST) SS1))
+     (GDD-WRITEBLOCK
+       ENCONNECT
+       (LIST
+   (CONS "VALUE" VALUE)
+   (CONS "HANDLEARROW" (CDR (ASSOC 5 (ENTGET ENARROW))))
+       )
+     )
+     (COND
+       (PLACEMENTPROMPT
+  (SETQ PNTTEMP INSPNT)
+  (COND
+    ((/= BULGE 0)
+     ;;(prompt "\nLocation along curve: ")
+     (COMMAND "._rotate" SS1 "" CENPNT "_r" CENPNT INSPNT PAUSE)
+     (SETQ PNTTEMP (CDR (ASSOC 10 (ENTGET (ENTLAST)))))
+    )
+  )
+  ;;(prompt "\nInsertion point: ")
+  (COMMAND "._move" SS1 "" PNTTEMP PAUSE)
+       )
+     )
+    )
+  )
+)
+
+
+;;;  GDD-UPDATE
+(DEFUN
+   GDD-UPDATE (SS1 DISPLACEMENT  / BULGE  CENPNT CTYPE DISPLAYELEV DONE EG EGI
+         ELEV EN EN3DLINE  ENARROW  ENCONNECTOR ENI  ENJ ENPNT1 ENPNT3 ET I
+         INSPNT INSPT NCONNECTORS  OLDVALUE PNT1 PNT2 PNT3D1 PNT3D3
+         SLOPEDIR  SSALLCONNECTORS  VALUE READLIST CHORD NEWBULGE NEWRADIUS
+         OLDBULGE  OLDRADIUS RADIUS
+        )
+;;;  1.  Updates the z coordinate of points to match their display elevations plus an increment
+;;;  2.  Updates connectors associated with points
+;;;  This really should allow the passing of a set of connectors and/or points (for speed)
+;;;  It also should only update the points and connectors that need it.
+;;;  Points only if elev is different than z coordinate.
+;;;  Connectors only if anything changed.
+;;;
+  (COND
+    (SS1
+     (COMMAND "._undo" "g")
+     ;;1.  Move all the points that need it to their display elevations plus an increment.
+     (SETQ
+       NCONNECTORS 0
+       I -1
+     )
+     (WHILE (SETQ ENI (SSNAME SS1 (SETQ I (1+ I))))
+       ;;If its a point
+       (COND
+   ((/= "GDDCONNECT" (STRCASE (CDR (ASSOC 2 (SETQ EGI (ENTGET ENI))))))
+    ;;Get elevation attribute from block
+    (SETQ
+      DISPLAYELEV
+       (CDR (ASSOC "ELEV" (GDD-READBLOCK ENI '(("ELEV")))))
+    )
+    ;;Move the point if needed.
+    (SETQ EGI (ENTGET ENI))
+    (COND
+      ((OR
+         (/=
+     (SETQ ELEV (+ (GDD-FULLELEV DISPLAYELEV) (CADDR DISPLACEMENT)))
+     (CDR (ASSOC 10 EGI))
+         )
+         (/= (CAR DISPLACEMENT) 0)
+         (/= (CADR DISPLACEMENT) 0)
+       )
+       (COMMAND
+         "._MOVE"
+         ENI
+         ""
+         (CDR (ASSOC 10 EGI))
+         (LIST
+     (+ (CADR (ASSOC 10 EGI)) (CAR DISPLACEMENT))
+     (+ (CADDR (ASSOC 10 EGI)) (CADR DISPLACEMENT))
+     ELEV
+         )
+       )
+      )
+    )
+    ;;Edit the display elevation if needed
+    (COND
+      ((/= (CADDR DISPLACEMENT) 0)
+       (SETQ DISPLAYELEV (GDD-SHORTELEV (RTOS ELEV 2)))
+       (GDD-WRITEBLOCK
+         ENI
+         (LIST
+     (CONS "ELEV" DISPLAYELEV)
+     (CONS "PREFELEV" DISPLAYELEV)
+     (CONS "MINELEV" DISPLAYELEV)
+     (CONS "MAXELEV" DISPLAYELEV)
+         )
+       )
+      )
+    )
+   )
+   ;;If it isn't a point, count it as a connector.
+   (T (SETQ NCONNECTORS (1+ NCONNECTORS)))
+       )
+     )
+     ;;2.  Check each connector in the drawing to see if it refers to a point in SS1.
+     (SETQ
+       SSALLCONNECTORS
+  (SSGET
+    "X"
+    (LIST (CONS 0 "INSERT") (CONS 2 "GDDCONNECT"))
+  )
+       I -1
+     )
+     (WHILE
+       (AND SSALLCONNECTORS (SETQ ENI (SSNAME SSALLCONNECTORS (SETQ I (1+ I)))))
+  ;;Get its associated points
+  ;;By stepping though attributes in connector block.
+  (SETQ
+    ENJ ENI
+    ENPNT1 NIL
+    ENPNT3 NIL
+    READLIST
+     (GDD-READBLOCK ENI '(("HANDLEPOINT1") ("HANDLEPOINT2")))
+    ENPNT1
+     (HANDENT (CDR (ASSOC "HANDLEPOINT1" READLIST)))
+    ENPNT3
+     (HANDENT (CDR (ASSOC "HANDLEPOINT2" READLIST)))
+  )
+  ;;If either of its associated points is in the SS1 update set, add the connector to the SS1 set.
+  (COND
+    ((OR (AND ENPNT1 (SSMEMB ENPNT1 SS1)) (AND ENPNT3 (SSMEMB ENPNT3 SS1)))
+     (SSADD ENI SS1)
+     (SETQ NCONNECTORS (1+ NCONNECTORS))
+    )
+  )
+     )
+     ;;3.  Update connectors
+     (SETQ I -1)
+     (WHILE (SETQ ENCONNECTOR (SSNAME SS1 (SETQ I (1+ I))))
+       ;;If its a connector
+       (COND
+   ((= "GDDCONNECT"
+       (STRCASE (CDR (ASSOC 2 (SETQ EGI (ENTGET ENCONNECTOR)))))
+    )
+    ;;Get the values needed from each connector block.
+    (SETQ
+      READLIST
+       (GDD-READBLOCK
+         ENCONNECTOR
+         '(("VALUE")
+     ("HANDLEPOINT1")
+     ("HANDLEPOINT2")
+     ("HANDLE3DLINE")
+     ("HANDLEARROW")
+     ("BULGE")
+     ("CHORD")
+     ("TYPE")
+    )
+       )
+      OLDVALUE
+       (HANDENT (CDR (ASSOC "VALUE" READLIST)))
+      ENPNT1
+       (HANDENT (CDR (ASSOC "HANDLEPOINT1" READLIST)))
+      ENPNT3
+       (HANDENT (CDR (ASSOC "HANDLEPOINT2" READLIST)))
+      EN3DLINE
+       (HANDENT (CDR (ASSOC "HANDLE3DLINE" READLIST)))
+      ENARROW
+       (CDR (ASSOC "HANDLEARROW" READLIST))
+      ENARROW
+       (IF ENARROW
+         (HANDENT ENARROW)
+       )
+      BULGE
+       (ATOF (CDR (ASSOC "BULGE" READLIST)))
+      CHORD
+       (ATOF (CDR (ASSOC "CHORD" READLIST)))
+      CTYPE
+       (CDR (ASSOC "TYPE" READLIST))
+    )
+    ;;If the two associated points exist, update the connector.
+    (COND
+      ((AND
+         (SETQ PNT3D1 (CDR (ASSOC 10 (ENTGET ENPNT1))))
+         (SETQ PNT3D3 (CDR (ASSOC 10 (ENTGET ENPNT3))))
+       )
+       ;;Get the current locations of the points it connects and do calculations.
+       (SETQ
+         VALUE
+    (IF (= CTYPE "SLOPE")
+      (STRCAT
+        (GDD-GETVAR "CONNECTPREFIX")
+        (RTOS
+          (* (ABS (GDD-SLOPE PNT3D1 PNT3D3 BULGE))
+       (ATOF (GDD-GETVAR "CONNECTFACTOR"))
+          )
+          2
+          (ATOI (GDD-GETVAR "CONNECTPREC"))
+        )
+        (GDD-GETVAR "CONNECTSUFFIX")
+      )
+      (RTOS (GDD-RISE PNT3D1 PNT3D3) 2 3)
+    )
+         RADIUS
+    (GDD-SEGMENT-RADIUS
+      '(0.0 0.0 0.0)
+      (LIST 0.0 CHORD 0.0)
+      BULGE
+    )
+         BULGE
+    (* (IF (MINUSP BULGE)
+         -1
+         1
+       )
+       (GDD-RCTOBULGE
+         RADIUS
+         (DISTANCE (GDD-FLATTEN PNT3D1) (GDD-FLATTEN PNT3D3))
+       )
+    )
+         INSPNT
+    (GDD-FLATTEN (GDD-SEGMENT-MIDPOINT PNT3D1 PNT3D3 BULGE))
+         CENPNT
+    (GDD-FLATTEN (GDD-SEGMENT-CENTER PNT3D1 PNT3D3 BULGE))
+         SLOPEDIR
+    (GDD-SLOPEDIR INSPNT PNT3D1 PNT3D3 BULGE)
+       )
+       ;;If anything has changed, update the connector
+       (COND
+         ((OR (/= VALUE OLDVALUE) (/= INSPT (CDR (ASSOC 10 EGI))))
+    ;;Delete 3d line
+    (ENTDEL EN3DLINE)
+    ;; If connector type is slope, delete arrow.
+    (COND ((= CTYPE "SLOPE") (ENTDEL ENARROW)))
+    ;;Delete connector
+    (ENTDEL ENCONNECTOR)
+    ;;Insert new connector
+    (GDD-INSERTCONNECTOR
+      ;;Type of connector
+      CTYPE
+      ;;What to connect to
+      ENPNT1
+      ;;Entlast is the last point in the reversed list
+      ENPNT3
+      BULGE
+      (IF (> NCONNECTORS (ATOI (GDD-GETVAR "CONNECTORUSERPLACE")))
+        NIL
+        T
+      )
+    )
+         )
+       )
+      )
+      ;;Otherwise alert about the error
+      (T
+       (REDRAW ENCONNECTOR 3)
+       (ALERT
+         (PRINC
+     (STRCAT
+       "The highlighted connector is missing an endpoint.\n\nCan't update it.  Please note before continuing."
+     )
+         )
+       )
+       (REDRAW ENCONNECTOR 4)
+      )
+    )
+   )
+       )
+     )
+     (COMMAND "._undo" "end" "._select" SS1 "")
+    )
+  )
+  (PRINC)
+)
+
+;;;  GDD-SLOPE Returns slope between two 3d coordinate point lists
+(DEFUN
+   GDD-SLOPE (COORDS1 COORDS2 BULGE /)
+  (/ (GDD-RISE COORDS1 COORDS2) (GDD-SEGMENT-LENGTH COORDS1 COORDS2 BULGE))
+)
+
+;;;  GDD-RISE Returns rise between two 3d coordinate points
+(DEFUN GDD-RISE (COORDS1 COORDS2 /) (- (CADDR COORDS2) (CADDR COORDS1)))
+;;;----------------------------------------------------------------------------
+;;;  Geometry functions---------------------------------------------------------
+;;;----------------------------------------------------------------------------
+
+;;;  GDD-FLATTEN
+(DEFUN
+   GDD-FLATTEN (PNT / EG)
+;;;Returns flattened coordinates of a 3d point
+  ;;Get the entity's DXF list.
+  (LIST (CAR PNT) (CADR PNT) 0.0)
+)
+
+;;;  Trig functions not included with AutoLISP
+(DEFUN GDD-ASIN (X) (ATAN X (SQRT (- 1 (* X X)))))
+(DEFUN GDD-ACOS (X) (ATAN (SQRT (- 1 (* X X))) X))
+(DEFUN GDD-TAN (X) (/ (SIN X) (COS X)))
+
+;;;  Generic 2D segment arc property functions based on 2dPNT1, 2dPNT2, and bulge
+
+;;;  GDD-SEGMENT-CENTER
+(DEFUN
+   GDD-SEGMENT-CENTER (2DPNT1 2DPNT2 BULGE /)
+  ;;Returns the center point of a segment.
+  ;;Returns nil if bulge=0
+  (COND
+    ((= BULGE 0) NIL)
+    (T
+     (SETQ
+       ;;Make sure points are truly 2d
+       2DPNT1
+  (GDD-FLATTEN 2DPNT1)
+       2DPNT2
+  (GDD-FLATTEN 2DPNT2)
+     )
+     (POLAR
+       2DPNT1
+       ;;Angle from chord to center is (pi - delta)/2
+       ;;And delta is 4 * atan(bulge)
+       (+ (ANGLE 2DPNT1 2DPNT2) (/ (- PI (* 4 (ATAN BULGE))) 2.0))
+       ;;Radius is half the chord over sin (delta/2)
+       ;;Delta is 4*atan(bulge)
+       (/ (DISTANCE 2DPNT1 2DPNT2) 2.0 (SIN (* 2 (ATAN BULGE))))
+     )
+    )
+  )
+)
+
+;;;  GDD-SEGMENT-MIDPOINT
+(DEFUN
+   GDD-SEGMENT-MIDPOINT  (2DPNT1 2DPNT2 BULGE /)
+  ;;Returns the midpoint of a connector.
+  (POLAR
+    2DPNT1
+    ;;Bulge is the bulged distance over half the chord,
+    ;;which happens to be the tan of the angle we need.
+    (- (ANGLE 2DPNT1 2DPNT2) (ATAN BULGE))
+    ;;Use pythagorean theorem to get hypotenuse distance
+    ;;based on chord and bulge.
+    (* (/ (DISTANCE 2DPNT1 2DPNT2) 2.0) (SQRT (+ 1 (EXPT BULGE 2))))
+  )
+)
+
+;;;  GDD-SEGMENT-RADIUS
+(DEFUN
+   GDD-SEGMENT-RADIUS (2DPNT1 2DPNT2 BULGE / DELTA DOVER2)
+;;;  Returns nil if bulge = 0
+;;;  Always returns a positive radius.
+  (COND
+    ((/= 0 BULGE)
+     (SETQ
+       ;;Make sure points are truly 2d
+       2DPNT1
+  (GDD-FLATTEN 2DPNT1)
+       2DPNT2
+  (GDD-FLATTEN 2DPNT2)
+       DOVER2
+  (ABS (* 2 (ATAN BULGE)))
+       DELTA
+  (* 2 DOVER2)
+     )
+     (/ (DISTANCE 2DPNT1 2DPNT2) 2.0 (SIN DOVER2))
+    )
+    (T NIL)
+  )
+)
+
+;;;  GDD-SEGMENT-LENGTH
+(DEFUN
+   GDD-SEGMENT-LENGTH
+;;;  Returns curve or straight length of a segment.
+          (2DPNT1 2DPNT2 BULGE / D DELTA DOVER2 L R)
+  (SETQ
+    ;;Make sure points are truly 2d
+    2DPNT1
+     (GDD-FLATTEN 2DPNT1)
+    2DPNT2
+     (GDD-FLATTEN 2DPNT2)
+    D (/ (DISTANCE 2DPNT1 2DPNT2) 2)
+  ) ;_ end of setq
+  (COND
+    ((/= 0 BULGE)
+     (SETQ
+       DOVER2
+  (ABS (* 2 (ATAN BULGE)))
+       DELTA
+  (* 2 DOVER2)
+       R (/ D (SIN DOVER2))
+     ) ;_ end of setq
+     (* DELTA R)
+    )
+    (T (* D 2))
+  ) ;_ end of cond
+)
+
+;;;  GDD-SEGMENT-DELTA
+(DEFUN GDD-SEGMENT-DELTA (2DPNT1 2DPNT2 BULGE) (GDD-BULGE-TO-DELTA BULGE))
+(DEFUN
+   GDD-BULGE-TO-DELTA (BULGE / DOVER2)
+;;;  Returns nil if bulge = 0
+  (COND
+    ((/= 0 BULGE)
+     (SETQ DOVER2 (ABS (* 2 (ATAN BULGE))))
+     (*  2
+  DOVER2
+  (IF (MINUSP BULGE)
+    -1
+    1
+  )
+     )
+    )
+    (T NIL)
+  )
+)
+
+;;;  GDD-SEGMENT-CHORD
+(DEFUN
+   GDD-SEGMENT-CHORD
+;;;  Returns CHORD of a segment or nil if bulge = 0
+         (2DPNT1 2DPNT2 BULGE / D DELTA DOVER2 L R)
+  (SETQ
+    ;;Make sure points are truly 2d
+    2DPNT1
+     (GDD-FLATTEN 2DPNT1)
+    2DPNT2
+     (GDD-FLATTEN 2DPNT2)
+  ) ;_ end of setq
+  (COND
+    ((/= 0 BULGE) (DISTANCE 2DPNT1 2DPNT2))
+    (T NIL)
+  ) ;_ end of cond
+)
+
+;;;  GDD-3PTTOBULGE
+(DEFUN
+   GDD-3PTTOBULGE (PNT1 PNT2 PNT3 / ANG1 ANG2A ANG3 BULGE CHORD DELTA DELTA1 R)
+;;;Returns the bulge of an arc defined by three points, PNT1, PNT2, and PNT3
+;;;If point 2 nil, returns 0.
+;;;In geometry triangle terms, R=a/(2*sin(A)) for any of the three points
+;;;The sum of angles 1 and 3 is delta
+  (COND
+    ((NOT PNT2) 0)
+    (T
+     (SETQ
+       CHORD
+  (DISTANCE PNT1 PNT3)
+       ANG2A
+  (- (ANGLE PNT2 PNT1) (ANGLE PNT2 PNT3))
+       ;;If sin(ang1) is negative, bulge is negative.
+       R
+  (/ CHORD (* 2 (SIN ANG2A)))
+       DELTA1
+  (* 2 (GDD-ASIN (/ CHORD (* 2 R))))
+       ANG1
+  (- (ANGLE PNT1 PNT3) (ANGLE PNT1 PNT2))
+       ANG1
+  (ABS
+    (IF (> ANG1 PI)
+      (- ANG1 (* 2 PI))
+      ANG1
+    )
+  )
+       ANG3
+  (- (ANGLE PNT3 PNT1) (ANGLE PNT3 PNT2))
+       ANG3
+  (ABS
+    (IF (> ANG3 PI)
+      (- ANG3 (* 2 PI))
+      ANG3
+    )
+  )
+       DELTA
+  (* 2 (+ ANG1 ANG3))
+       BULGE
+  (* (IF (MINUSP R)
+       -1
+       1
+     )
+     (GDD-TAN (/ DELTA 4.0))
+  )
+     )
+    )
+  )
+)
+
+;;;  GDD-RCT0BULGE
+(DEFUN
+   GDD-RCTOBULGE (RADIUS CHORD)
+;;;  Converts radius and chord to bulge.
+;;;  Returns the bulge of an arc with the given radius and chord..
+;;;  Returns 0.0 if either argument is nil
+  (IF (AND RADIUS CHORD)
+    (GDD-TAN (/ (GDD-ASIN (/ CHORD RADIUS 2.0)) 2.0))
+    0.0
+  )
+)
+
+;;;  End geometry functions-----------------------------------------------------
+
+;;;  GDD-DRAW3DLINE
+(DEFUN
+   GDD-DRAW3DLINE (PNT3D1 PNT3D3 BULGE / 2DPNTI  3DCURVEPNTS CENTERPNT CURVEERROR
+       DELTA DELTAI  I NUMSEGMENTS R  RISEI STARTANGLE STARTELEV
+      )
+;;;  Draws a 3D POLYLINE for a digital terrain model.
+;;;  If bulge isn't 0, draws a segmented 3D polyline to approximate an arc,
+;;;  Splits arc into line segments based on given error.
+;;;  Value of error is the maximum distance the true 2d arc
+;;;  varies from a segment of the approximated 2d arc.
+;;;  There are always a minimum of two segments in the approximated arc.
+;;;  Approximated 2d arc touches true 2d arc at segment ends.
+;;;  Returns entity name of line.
+  (COND
+    ((/= BULGE 0)
+     ;; Calculate the number of segments for the approximated arc.
+     ;; First we need to know the arc that goes through the endpoints.
+     ;; We know that the radius for a segment = the radius for the true arc.
+     ;; So we draw a sketch and find that,
+     ;; r - error / r = cos (delta / 2). Or delta = 2 acos (1 - error/r).
+     (SETQ
+       CURVEERROR
+  (ATOF (GDD-GETVAR "CURVEERROR"))
+       R (GDD-SEGMENT-RADIUS PNT3D1 PNT3D3 BULGE)
+       DELTAI
+  (* 2 (GDD-ACOS (MAX 0 (- 1 (/ CURVEERROR R)))))
+     )
+     ;; Now we can find the minimum number of segments (at least 2)
+     ;; that will yield less than the allowed error.
+     (SETQ
+       DELTA
+  (GDD-SEGMENT-DELTA PNT3D1 PNT3D3 BULGE)
+       NUMSEGMENTS
+  (MAX 2 (1+ (FIX (ABS (/ DELTA DELTAI)))))
+     )
+     ;; Now adjust deltai to make an even number of segments of delta.
+     (SETQ DELTAI (/ DELTA NUMSEGMENTS))
+     ;; Get 2D center point and starting angle
+     (SETQ
+       CENTERPNT
+  (GDD-SEGMENT-CENTER PNT3D1 PNT3D3 BULGE)
+       STARTANGLE
+  (ANGLE CENTERPNT (GDD-FLATTEN PNT3D1))
+       STARTELEV
+  (CADDR PNT3D1)
+       RISEI
+  (/ (- (CADDR PNT3D3) STARTELEV) NUMSEGMENTS)
+     )
+     ;;Now build the point list for the 3d pline.
+     (SETQ
+       I 0
+       3DCURVEPNTS
+  (LIST PNT3D1)
+     )
+     (WHILE (<= (SETQ I (1+ I)) NUMSEGMENTS)
+       (SETQ
+   2DPNTI
+    (POLAR CENTERPNT (+ STARTANGLE (* I DELTAI)) R)
+   3DCURVEPNTS
+    (CONS
+      (LIST
+        (CAR 2DPNTI)
+        (CADR 2DPNTI)
+        (+ STARTELEV (* I RISEI))
+      )
+      3DCURVEPNTS
+    )
+       )
+     )
+     (GDD-MAKE3DPOLY (REVERSE 3DCURVEPNTS))
+    )
+    ;; If not a curve, just connect points
+    (T (GDD-MAKE3DPOLY (LIST PNT3D1 PNT3D3)))
+  )
+  (ENTLAST)
+)
+
+
+;;;  GDD-MAKE3dPOLY
+(DEFUN
+   GDD-MAKE3DPOLY (PNTLIST)
+  (ENTMAKE
+    (LIST
+      '(0 . "POLYLINE")
+      '(100 . "AcDbEntity")
+      '(100 . "AcDb3dPolyline")
+      '(70 . 8)
+    )
+  )
+  (FOREACH
+     PNT PNTLIST
+    (ENTMAKE
+      (LIST
+  '(0 . "VERTEX")
+  '(100 . "AcDb3dPolylineVertex")
+  (CONS 10 PNT)
+  '(70 . 32)
+      )
+    )
+  )
+  (ENTMAKE '((0 . "SEQEND")))
+)
+
+
+;;;  GDD-SLOPEDIR
+(DEFUN
+   GDD-SLOPEDIR  (INSPNT COORDS1 COORDS2 BULGE / CENPNT DELTA DOVER2 L R)
+;;;Returns the direction for the connector slope.
+  (COND
+    ;;If a line,
+    ((= BULGE 0)
+     ;;If slope is downward
+     (IF (MINUSP (GDD-RISE COORDS1 COORDS2))
+       ;;point to 2
+       (ANGLE COORDS1 COORDS2)
+       ;;otherwise point to 1.
+       (ANGLE COORDS2 COORDS1)
+     )
+    )
+    ;;If an arc,
+    (T
+     ;;figure out the arc properties from the bulge value
+     (SETQ CENPNT (GDD-SEGMENT-CENTER COORDS1 COORDS2 BULGE))
+     ;;then use the sign (+/-) of the bulge and the rise
+     ;;to get the sign of the arrow (if they're both positive, it's negative).
+     ;;
+     ;; Rise  Bulge  Dir
+     ;;  +      +     -   Rising around a ccw curve, arrow points cw
+     ;;  -      +     +   Falling around a ccw curve, arrow points ccw
+     ;;  +      -     +   Rising around a cw curve, arrow points ccw
+     ;;  -      -     -   Falling around a cw curve, arrow points cw
+     (+  (ANGLE CENPNT INSPNT)
+  (* (/ PI 2)
+     -1
+     (IF (MINUSP (GDD-RISE COORDS1 COORDS2))
+       -1
+       1
+     )
+     (IF (MINUSP BULGE)
+       -1
+       1
+     )
+  )
+     )
+    )
+  )
+)
+
+(DEFUN
+   GDD-RIGHTSIDEUP (ANG / FLIPPINGANGLE TESTANGLE)
+;;;Flips an angle if necessary for right-side upness of text.
+  (SETQ
+    FLIPPINGANGLE
+     (/ 7.0 24.0)
+    TESTANGLE
+     (/ ANG (* 2.0 PI))
+  )
+  (COND
+    ((OR (< FLIPPINGANGLE TESTANGLE (+ FLIPPINGANGLE 0.5))
+   (> (* -1 FLIPPINGANGLE) TESTANGLE (- -0.5 FLIPPINGANGLE))
+     )
+     (+ ANG PI)
+    )
+    (ANG)
+  )
+)
+;;;  Misc functions ----------------------------------------------------------
+
+(DEFUN GDD-ICAD-P () (OR (WCMATCH (GETVAR "acadver") "*i") *GDD-ICADMODE*))
+          ;*GDD-ICADMODE* is for testing in AutoCAD.
+
+;;;  GDD-MAKELAYER sub-function defines and makes current a layer for another routine.
+(DEFUN
+   GDD-MAKELAYER (STRLAOPT / LAOPT LANAME LACOLR LALTYP LTFILE)
+;;; Usage: (mklayr "'(\"laname\" \"lacolr\" \"laltyp\")")
+;;; Use empty quotes for default color and linetype (eg. (mklay "'(\"AZ\" \"\" \"\")")
+  ;; Convert string to layer list.
+  (SETQ LAOPT (READ STRLAOPT))
+  (COND
+    ;;If in ICAD mode, do nothing because we are getting an error trying to invoke the layer command.
+    ((GDD-ICAD-P))
+    (T
+     (SETQ
+       LANAME
+  (CAR LAOPT)
+       LACOLR
+  (CADR LAOPT)
+       LALTYP
+  (CADDR LAOPT)
+       LTFILE "acad"
+     )
+     (IF (NOT (OR (= LALTYP "") (TBLSEARCH "LTYPE" LALTYP)))
+       (PROGN (COMMAND "._linetype" "l" LALTYP "acad") (COMMAND))
+     )
+     (IF (NOT (OR (= LALTYP "") (TBLSEARCH "LTYPE" LALTYP)))
+       (PROGN
+   (ALERT
+     (STRCAT
+       "AutoCAD could not find "
+       LALTYP
+       " linetype.\n\nUsing default linetype."
+     )
+   )
+   (SETQ LALTYP "")
+       )
+     )
+     (COMMAND "._layer")
+     (IF (NOT (TBLSEARCH "LAYER" LANAME))
+       (COMMAND "m" LANAME)
+       (COMMAND "t" LANAME "on" LANAME "u" LANAME "s" LANAME)
+     )
+     (IF (/= LACOLR "")
+       (COMMAND "c" LACOLR "")
+     )
+     (IF (/= LALTYP "")
+       (COMMAND "lt" LALTYP "")
+     )
+     (COMMAND "")
+     LAOPT
+    )
+  )
+)
+
+
+;;;  GDD-SETUP
+(DEFUN C:GDD-SETUP () (WHILE (GDD-SETUP NIL)))
+(DEFUN
+   GDD-SETUP (INPUT / CVAL)
+;;;Displays prompt and gets user input to change setup values
+  (COND
+    ((NOT INPUT)
+     (INITGET "AVerage Digits Curb Error Connector ADdition Slope")
+     (SETQ
+       INPUT
+  (GETKWORD
+    (STRCAT
+      "\nAverage elevation="
+      (GDD-GETVAR "AVGELEV")
+      ", Elevation digits="
+      (GDD-GETVAR "DISPLAYDIGITS")
+      ", Curb height="
+      (GDD-GETVAR "CURBHEIGHT")
+      ", Curve error="
+      (GDD-GETVAR "CURVEERROR")
+      ", Elevation add="
+      (GDD-GETVAR "OBJECTADD")
+      ", Slope="
+      (GDD-GETVAR "OBJECTSLOPE")
+      "\nAverage project elevation/elevation Digits to show/Curb height/curve Error/Connector placement/Addition from object/Slope from object: "
+    )
+  )
+     )
+    )
+  )
+  (COND
+    ((= INPUT "AVerage")
+     (GDD-SETFROMINPUT 'GETINT 'INT "Average project elevation" "AVGELEV")
+    )
+    ((= INPUT "Digits")
+     (GDD-SETFROMINPUT
+       'GETINT
+       'INT
+       "Digits left of decimal to display for automatic elevations"
+       "DISPLAYDIGITS"
+     )
+    )
+    ((= INPUT "Curb")
+     (GDD-SETFROMINPUT
+       'GETREAL
+       'REAL
+       "Curb height (elevation to add to first elevation for double elevation points)"
+       "CURBHEIGHT"
+     )
+    )
+    ((= INPUT "Error")
+     (GDD-SETFROMINPUT
+       'GETREAL
+       'REAL
+       "Maximum distance error to allow in segmenting 3d curves"
+       "CURVEERROR"
+     )
+    )
+    ((= INPUT "Connector")
+     (GDD-SETFROMINPUT
+       'GETINT
+       'INT
+       "Maximum times to prompt for manual connector placement on updates (0 for automatic always)"
+       "CONNECTORUSERPLACEMAX"
+     )
+     (GDD-SETVAR "CONNECTORUSERPLACE" (GDD-GETVAR "CONNECTORUSERPLACEMAX"))
+     (IF (= (GDD-GETVAR "CONNECTORUSERPLACE") "0")
+       (MENUCMD "GGDD.ID_GDDCPTOG=")
+       (MENUCMD "GGDD.ID_GDDCPTOG=!.")
+     )
+    )
+    ((= INPUT "ADdition")
+     (GDD-SETFROMINPUT
+       'GETREAL
+       'REAL
+       "Elevation to add to selected objects (0 to turn off)"
+       "OBJECTADD"
+     )
+    )
+    ((= INPUT "Slope")
+     (GDD-SETFROMINPUT
+       'GETREAL
+       'REAL
+       "Slope to run up from selected objects (0 to turn off)"
+       "OBJECTSLOPE"
+     )
+    )
+    (INPUT)
+  )
+)
+;;;  GDD-PROJINIT
+;;;  Initializes values for project that are required.
+;;;  This function would not be needed if an ini or the registry or setcfg were used.
+(DEFUN
+   GDD-PROJINIT  (/ DISPLAYDIGITSLIST ELEVLIST I SS1)
+  (SETQ
+    SS1  (SSGET "X" '((0 . "INSERT") (2 . "GDDPOINT*")))
+    I  -1
+  )
+  (COND
+    (SS1
+     (WHILE (SETQ ENI (SSNAME SS1 (SETQ I (1+ I))))
+       (SETQ
+   ELEVLIST
+    (CONS (RTOS (CADDDR (ASSOC 10 (ENTGET ENI))) 2 0) ELEVLIST)
+       )
+       (COND
+   ((< I 10)
+    (SETQ
+      DISPLAYDIGITSLIST
+       (CONS
+         (ITOA
+     (STRLEN
+       (ITOA
+         (ATOI
+           (CDR
+       (ASSOC
+         "ELEV"
+         (GDD-READBLOCK ENI '(("ELEV")))
+       )
+           )
+         )
+       )
+     )
+         )
+         DISPLAYDIGITSLIST
+       )
+    )
+   )
+       )
+     )
+     (GDD-SETVAR
+       "AVGELEV"
+       (NTH (/ (LENGTH ELEVLIST) 2) (ACAD_STRLSORT ELEVLIST))
+     )
+     (GDD-SETVAR
+       "DISPLAYDIGITS"
+       (NTH (/ (LENGTH DISPLAYDIGITSLIST) 2) (ACAD_STRLSORT DISPLAYDIGITSLIST))
+     )
+    )
+    (T (LIST (GDD-SETUP "AVerage") (GDD-SETUP "Digits")))
+  )
+)
+;;;  GDD-SETVAR
+(DEFUN
+   GDD-SETVAR (KEY STRVALUE / EXIST)
+;;;Sets a semi-permanent default value for GDD use.
+;;;Currently uses an AutoLISP session variable.
+;;;Could be modified to use an attributed block,
+;;;an ini file, or the Windows registry.
+;;;Returns STRVALUE
+  (COND
+    ;;If default is already in list, replace it.
+    ((SETQ EXIST (ASSOC KEY *GDD-DEFAULTS*))
+     (SETQ *GDD-DEFAULTS* (SUBST (CONS KEY STRVALUE) EXIST *GDD-DEFAULTS*))
+    )
+    ;;Otherwise, add it to list.
+    (T (SETQ *GDD-DEFAULTS* (CONS (CONS KEY STRVALUE) *GDD-DEFAULTS*)))
+  )
+  STRVALUE
+)
+
+;;;  GDD-GETVAR
+(DEFUN
+   GDD-GETVAR (KEY / ELEV NESTED VALUE)
+;;;Gets a semi-permanent default value for GDD use.
+;;;Currently uses an AutoLISP session variable.
+;;;Could be modified to use an attributed block,
+;;;an ini file, or the Windows registry.
+  ;;If the requested variable is a drawing-specific mandatory setting
+  ;;(average project elevation and display digits)
+  ;;and hasn't been initialized yet,
+  ;;initialize it from the drawing or the user.
+  (COND
+    ((AND
+       (MEMBER KEY '("AVGELEV" "DISPLAYDIGITS"))
+       (= NIL (CDR (ASSOC "AVGELEV" *GDD-DEFAULTS*)))
+     )
+     (GDD-SETVAR "AVGELEV" "0")
+     (GDD-SETVAR "DISPLAYDIGITS" "2")
+     (GDD-PROJINIT)
+    )
+  )
+  ;;If application defaults haven't been loaded, load them,
+  ;;All the values below are stored as strings for possible future
+  ;;registry and file simplicity
+  (COND
+    ;;First try to get from defaults in drawing.
+    ((CDR (ASSOC KEY *GDD-DEFAULTS*)))
+    ;;Second try to get from hard-coded application defaults.
+    ((GDD-SETVAR
+       KEY
+       (CDR
+   (ASSOC
+     KEY
+     (LIST
+       (CONS "CURBHEIGHT" "0.50")
+       (CONS "CURVEERROR" "1.0")
+       ;;No application default available.  Have to get from drawing or user.
+       (CONS "AVGELEV" NIL)
+       ;;No application default available.  Have to get from drawing or user.
+       (CONS "DISPLAYDIGITS" NIL)
+       (CONS "DESCRIPTION1" "P")
+       (CONS "DESCRIPTION2" "TC")
+       (CONS "CONNECTORUSERPLACE" "2") ;2 to turn on 2 prompt max.
+       (CONS "CONNECTORUSERPLACEMAX" "2")
+       (CONS "CONNECTPREFIX" "S=")
+       (CONS "CONNECTSUFFIX" "%")
+       (CONS "CONNECTFACTOR" "100")
+       (CONS "CONNECTPREC" "2")
+       (CONS "LYRPOINT" "( \"GDD-POINT\" \"4\" \"\")")
+       (CONS "LYRCONNECTSLOPE" "(\"GDD-CONNECTSLOPE\" \"4\" \"\")")
+       (CONS "LYRCONNECTRISE" "(\"GDD-CONNECTRISE\" \"2\" \"\")")
+       (CONS "LYRARROW" "(\"GDD-ARROW\" \"2\" \"\")")
+       (CONS "LYR3DLINE" "(\"GDD-3DLINE\" \"5\" \"\")")
+       (CONS "OBJECTADD" "0")
+       (CONS "OBJECTSLOPE" "0.02")
+       ;;Point reference type can be "Object" select, "Read" from text, or "Prompt"
+       (CONS "POINTREFERENCETYPE" "Prompt")
+       (CONS "POINTDESCRIPTIONPROMPT" "On")
+       ;;Enable Z coordinate on move point
+       (CONS "POINTMOVEZ" "Off")
+     )
+   )
+       )
+     )
+    )
+    ;;If all else fails, declare a fatal error.
+    (T
+     (ALERT
+       (PRINC
+   (STRCAT "\nError: The requested key, " KEY ", is not known to GDD.")
+       )
+     )
+    )
+  )
+)
+
+(DEFUN
+   GDD-SETFROMINPUT (INPUTFUNC INPUTTYPE PRMPT VAR)
+  (GDD-SETVAR VAR (GDD-GETINPUT INPUTFUNC INPUTTYPE PRMPT VAR))
+)
+
+(DEFUN
+   GDD-GETINPUT  (INPUTFUNC INPUTTYPE PRMPT VAR)
+  (SETQ CVAL (GDD-GETVAR VAR))
+  (SETQ INPUT (APPLY INPUTFUNC (LIST (STRCAT "\n" PRMPT " <" CVAL ">: "))))
+  (COND
+    ((OR (AND (= INPUTFUNC 'GETSTRING) (= INPUT "")) (NOT INPUT)) CVAL)
+    (T
+     (GDD-SETVAR
+       VAR
+       (COND
+   ((= INPUTTYPE 'INT) (ITOA INPUT))
+   ((= INPUTTYPE 'REAL) (RTOS INPUT 2 6))
+   ((= INPUTTYPE 'STR) INPUT)
+       )
+     )
+    )
+  )
+)
+
+;;;  GDD-GETREFERENCE
+(DEFUN
+   GDD-GETREFERENCE (ELEVPROMPT / INPUT NESTED VAL)
+;;;  Gets a full elevation real or an object from user
+  (WHILE (NOT VAL)
+    (SETQ
+      VAL
+       ;;If there is a running prompt preference, use it.
+       (COND
+   ((= (SETQ VAL (GDD-GETVAR "POINTREFERENCETYPE")) "Object") VAL)
+   ((= VAL "Read") VAL)
+   (T
+    (INITGET "Setup Object Read")
+    (GETREAL
+      (STRCAT
+        "\nEnter "
+        ELEVPROMPT
+        " elevation or [Setup/Object/Read text] <Object>: "
+      )
+    )
+   )
+       )
+    )
+    (COND
+      ;;If a request for setup, set to nil and do setup.
+      ((= VAL "Setup") (SETQ VAL NIL) (GDD-SETUP NIL))
+      ;;If a request to read text, get string.
+      ((= VAL "Read")
+       (SETQ VAL (CAR (NENTSEL "\nSelect elevation text: ")))
+       (IF VAL
+   (SETQ VAL (CADR (GDD-EXTRACTX (CDR (ASSOC 1 (ENTGET VAL))) "*" 0)))
+       )
+       ;;Convert read text to full length elevation real.
+       (IF VAL
+   (SETQ VAL (GDD-FULLELEV VAL))
+       )
+      )
+      ;;If a request for object select, get object
+      ((OR (= VAL "Object") (NOT VAL))
+       (SETQ VAL (CAR (ENTSEL "\nSelect reference object: ")))
+      )
+      ;;Else, convert typed text string to full length elevation real.
+      ((SETQ VAL (GDD-FULLELEV (RTOS VAL 2))))
+    )
+  )
+)
+
+;;;  GDD-GETDESTINATION
+(DEFUN
+   GDD-GETDESTINATION (INPUTREF / PNTARC2 VAL)
+;;;  Gets the insertion point and any connector arc information
+;;;  for a point to be inserted
+;;;  Returns a list or a double list (list with two list elements).
+;;;  Either a point if no arc, or two points if an arc.
+  (COND
+    ((= (TYPE INPUTREF) 'ENAME)
+     (WHILE (NOT VAL)
+       (INITGET "Arc")
+       (SETQ VAL (GETPOINT "\nXY location for point or [Arc] <Arc>: "))
+       (COND
+   ((OR (NOT VAL) (= VAL "Arc"))
+    (SETQ VAL NIL)
+    (SETQ PNTARC2 (GETPOINT "\nSecond point for arc: "))
+   )
+       )
+     )
+     (IF PNTARC2
+       (LIST PNTARC2 VAL)
+       VAL
+     )
+    )
+    (T (GETPOINT "\nXY location for point: "))
+  )
+)
+
+;;;  GDD-FULLELEV
+(DEFUN
+   GDD-FULLELEV  (SHORTELEV / 10^SHORTLENGTH FULLELEV SHORTLENGTH TRUNCTYPELEV
+     TYPELEV ZEROPAD
+    )
+;;;Returns complete elevation real number based on entered elevation string
+;;;and average elevation.
+;;;Doesn't do anything if elevation is a real number because you can't pad initial zeros (like 00.20) with a real number
+  ;;If shortelev is a 'STR, convert to a full length 'REAL.  Otherwise, use it as is.
+  (COND
+    ((= (TYPE SHORTELEV) 'STR)
+     (IF (NOT (DISTOF SHORTELEV))
+       (ALERT (PRINC (STRCAT "\nInvalid elevation:\n\n" SHORTELEV)))
+     )
+     (SETQ ZEROPAD 1)
+     (WHILE (= (SUBSTR SHORTELEV 1 1) "0")
+       (SETQ
+   ZEROPAD
+    (1+ ZEROPAD)
+   SHORTELEV
+    (SUBSTR SHORTELEV 2)
+       )
+     )
+     (SETQ
+       SHORTELEV
+  (ATOF SHORTELEV)
+       SHORTLENGTH
+  (IF (= SHORTELEV 0)
+    1
+    (FIX (+ ZEROPAD (/ (LOG SHORTELEV) (LOG 10))))
+  )
+       10^SHORTLENGTH
+  (FIX (EXP (* (LOG 10) SHORTLENGTH)))
+       TYPELEV
+  (ATOI (GDD-GETVAR "AVGELEV"))
+       TRUNCTYPELEV
+  (* 10^SHORTLENGTH (/ TYPELEV 10^SHORTLENGTH))
+       FULLELEV
+  (+ SHORTELEV TRUNCTYPELEV)
+     )
+     (IF (> (- FULLELEV TYPELEV) (/ 10^SHORTLENGTH 2))
+       (- FULLELEV 10^SHORTLENGTH)
+       FULLELEV
+     )
+    )
+    (T
+     (ALERT
+       "GDD-FULLELEV function can only convert strings\nReturning original value."
+     )
+     SHORTELEV
+    )
+  )
+)
+
+;;;  GDD-SHORTELEV
+(DEFUN
+   GDD-SHORTELEV
+;;;Returns short elevation string based on full elevation string
+;;;and "DISPLAYDIGITS".
+     (FULLELEV / CHOPLENGTH)
+  ;;If fullelev is a 'STR, convert to a short length 'REAL.  Otherwise, use it as is.
+  (COND
+    ((= (TYPE FULLELEV) 'STR)
+     (IF (NOT (DISTOF FULLELEV))
+       (ALERT (PRINC (STRCAT "\nInvalid elevation:\n\n" FULLELEV)))
+     )
+     (SETQ
+       CHOPLENGTH
+  (- (STRLEN (ITOA (FIX (ATOF FULLELEV))))
+     (ATOI (GDD-GETVAR "DISPLAYDIGITS"))
+  )
+     )
+     (COND
+       ((< CHOPLENGTH 0)
+  (REPEAT (* -1 CHOPLENGTH) (SETQ FULLELEV (STRCAT "0" FULLELEV)))
+  FULLELEV
+       )
+       (T (SUBSTR FULLELEV (1+ CHOPLENGTH)))
+     )
+    )
+  )
+)
+
+
+
+
+;;;  GDD-GETSLOPE
+(DEFUN
+   GDD-GETSLOPE  (/ NESTED VALUE)
+;;;Gets a slope string from user or connector object.
+  (WHILE (NOT VALUE)
+    (SETQ VALUE (GETSTRING "\nSlope to new point: "))
+    (COND
+      ;;If user entered something,
+      ((/= VALUE "")
+       ;;Then if not a valid number
+       (IF (NOT (SETQ VALUE (DISTOF VALUE)))
+   ;;Set nil to try again
+   (SETQ VALUE NIL)
+   ;;But if a valid number, return it.
+   VALUE
+       )
+      )
+      ;;If no value entry, prompt for object selection
+      (T
+       (IF (SETQ VALUE (CAR (ENTSEL)))
+   (SETQ VALUE (RTOS (CADDDR (ASSOC 10 (ENTGET VALUE))) 2))
+       )
+      )
+    )
+  )
+  VALUE
+)
+
+;;;  GDD-READBLOCK
+(DEFUN
+   GDD-READBLOCK (EN VALUES / AT AV EG ET I J)
+;;;Reads the given values from attributes in the given block.
+;;;Values are in an association list '((tag))
+;;;Block is given as a entity name
+;;;Returns list of tags and values '((tag . value))
+  (SETQ
+    I (LENGTH VALUES)
+    J 0
+  )
+  (WHILE (AND
+     (/= J I)
+     (SETQ EN (ENTNEXT EN))
+     (/= "SEQEND" (SETQ ET (CDR (ASSOC 0 (SETQ EG (ENTGET EN)))))) ;_ end of /=
+   ) ;_ end of and
+    (COND
+      ((= ET "ATTRIB")
+       (SETQ
+   AT (CDR (ASSOC 2 EG))
+   AV (CDR (ASSOC 1 EG))
+       ) ;_ end of setq
+       (COND
+   ((ASSOC AT VALUES)
+    (SETQ
+      VALUES
+       (SUBST (CONS AT AV) (ASSOC AT VALUES) VALUES) ;_ end of SUBST
+      J (1+ J)
+    )
+   )
+       ) ;_ end of cond
+      )
+    ) ;_ end of cond
+  ) ;_ end of while
+  VALUES
+)
+
+;;;  GDD-WRITEBLOCK
+(DEFUN
+   GDD-WRITEBLOCK (EN VALUES / AT AV EG ET)
+;;;Writes the given values to the given block.
+;;;Values are in an association list '((tag . value))
+;;;Block is given as a entity name
+;;;No meaningful return value.  Could return block entity name or list of attributes.
+  ;;Fill in attributes
+  (WHILE (AND
+     (SETQ EN (ENTNEXT EN))
+     (/= "SEQEND" (SETQ ET (CDR (ASSOC 0 (SETQ EG (ENTGET EN)))))) ;_ end of /=
+   ) ;_ end of and
+    (COND
+      ((= ET "ATTRIB")
+       (SETQ
+   AT (CDR (ASSOC 2 EG))
+   AV (CDR (ASSOC 1 EG))
+       ) ;_ end of setq
+       (COND
+   ((ASSOC AT VALUES)
+    (ENTMOD
+      (SUBST (CONS 1 (CDR (ASSOC AT VALUES))) (ASSOC 1 EG) EG) ;_ end of SUBST
+    ) ;_ end of ENTMOD
+   )
+       ) ;_ end of cond
+       (ENTUPD EN)
+      )
+    ) ;_ end of cond
+  ) ;_ end of while
+)
+
+;;;  Extractx used to extract numerical info from a text string with  extended  options.
+(DEFUN
+   GDD-EXTRACTX  (S WC OPT / C DONE I PRE PREI NUMBER SUF SUFI)
+;;;  Copyright 2007 Thomas Gail Haws
+;;; Licensed to the public as Free Software under the terms of the GNU General Public License ver. 3 or later
+;;; Type 0 tries to match the wild cards with text preceding a number.
+;;; Type 1 tries to match the wild cards with text following a number
+  (SETQ
+    I (IF (= OPT 0)
+  0
+  (1+ (STRLEN S))
+      )
+    PRE  ""
+    NUMBER ""
+    SUF  ""
+  )
+  (REPEAT (STRLEN S)
+    (SETQ
+      C     (SUBSTR
+       S
+       (SETQ
+         I (IF (= OPT 0)
+       (1+ I)
+       (1- I)
+     )
+       )
+       1
+     )
+      PREI (SUBSTR S 1 (1- I))
+      SUFI (SUBSTR S (1+ I))
+    )
+    (COND
+      ((NOT
+   (WCMATCH
+     (IF (= OPT 0)
+       PREI
+       SUFI
+     )
+     WC
+   )
+       )
+       (IF (= OPT 0)
+   (SETQ PRE (STRCAT PRE C))
+   (SETQ SUF (STRCAT C SUF))
+       )
+      )
+      ((AND (WCMATCH C "#") (NOT DONE))
+       (SETQ
+   NUMBER
+    (IF (= OPT 0)
+      (STRCAT NUMBER C)
+      (STRCAT C NUMBER)
+    )
+       )
+      )
+      ((AND
+   (EQ C "-")
+   (= NUMBER "")
+   (NOT DONE)
+   (WCMATCH (SUBSTR S (1+ I) 1) "#")
+       )
+       (SETQ
+   NUMBER
+    (IF (= OPT 0)
+      (STRCAT NUMBER C)
+      (STRCAT C NUMBER)
+    )
+       )
+      )
+      ((AND (EQ C ".") (NOT DONE) (WCMATCH (SUBSTR S (1+ I) 1) "#"))
+       (SETQ
+   NUMBER
+    (IF (= OPT 0)
+      (STRCAT NUMBER C)
+      (STRCAT C NUMBER)
+    )
+       )
+      )
+      ((EQ NUMBER "")
+       (IF (= OPT 0)
+   (SETQ PRE (STRCAT PRE C))
+   (SETQ SUF (STRCAT C SUF))
+       )
+      )
+      (T
+       (SETQ DONE T)
+       (IF (= OPT 0)
+   (SETQ SUF (STRCAT SUF C))
+   (SETQ PRE (STRCAT C PRE))
+       )
+      )
+    )
+  )
+  (IF (NOT (ZEROP (STRLEN NUMBER)))
+    (LIST PRE NUMBER SUF)
+  )
+)
+
+;;;  Housekeeping functions-----------------------------------------------------
+
+;;
+;; GDD-icad-P
+(DEFUN
+   GDD-ICAD-P ()
+  ;;
+  ;;Tests whether intellicad behavior is current.
+  (OR (WCMATCH (GETVAR "acadver") "*i") *GDD-ICADMODE*)
+)
+
+;;;  Initialize the menu items to reflect defaults.
+(GDD-MENUINIT)
+ ;|«Visual LISP© Format Options»
+(80 2 40 2 nil "end of " 80 2 2 2 1 T nil nil nil)
+;*** DO NOT add text below the comment! ***|;

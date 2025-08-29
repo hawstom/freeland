@@ -1,0 +1,72 @@
+//
+//      AutoCAD menu file - C:\Design Center\GDD 1.0\gdd.mnu
+//
+
+***MENUGROUP=GDD
+
+***POP1
+               [&GDD]
+               [->GDD SETTINGS]
+ID_GDDSETUP      [General Setup]^C^CGDD-SETUP 
+ID_GDDAVGE       [Set Avg Elev]^C^CGDD-AVERAGEELEVATION 
+ID_GDDCRVMI      [Long Curve Segments]^C^CGDD-CURVEERROR 1.0 
+ID_GDDCRVMA      [Short Curve Segments]^C^CGDD-CURVEERROR 0.01 
+ID_GDDCRVS       [Customize Curve Segments]^C^CGDD-CURVEERROR 
+                 [--]
+ID_GDDCRB6       [Set 6" Curb]^C^CGDD-CURBHEIGHT 0.5 
+ID_GDDCRB4       [Set 4" Curb]^C^CGDD-CURBHEIGHT 0.33 
+ID_GDDCRBC       [<-Set Custom Curb]^C^CGDD-CURBHEIGHT 
+               [--]
+ID_GDDIPS      [Insert &Single Points]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Prompt");GDD-INSERTPOINTSINGLE;
+ID_GDDIPSS     [Single Points By S&lope]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Object");(GDD-SETVAR "OBJECTADD" "0");(GDD-SETUP "Slope");\GDD-INSERTPOINTSINGLE;
+ID_GDDIPSE     [Single Points By Elev Up/Down]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Object");(GDD-SETVAR "OBJECTSLOPE" "0");(GDD-SETUP "ADdition");\GDD-INSERTPOINTSINGLE;
+               [--]
+               [--]
+ID_GDDIPD      [Insert Double Point]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Prompt");GDD-INSERTPOINTDOUBLE;
+ID_GDDIPDS     [Double Points By Slope]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Object");(GDD-SETVAR "OBJECTADD" "0");(GDD-SETUP "Slope");\GDD-INSERTPOINTDOUBLE;
+ID_GDDIPDE     [Double Points By Elev Up/Down]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Object");(GDD-SETVAR "OBJECTSLOPE" "0");(GDD-SETUP "ADdition");\GDD-INSERTPOINTDOUBLE;
+               [--]
+ID_GDDRP       [Raise/Lower Point]^C^CGDD-RAISEPOINTS;
+ID_GDDMP       [Relocate Point]^C^CGDD-MOVEPOINTS;
+ID_GDDUP       [Update Points and Connections]^C^CGDD-UPDATE;
+ID_GDDES       [Edit Elevation by Slope]^C^CEDITSLOPE;
+ID_GDDIC       [Insert Slope]^C^CGDD-INSERTCONNECTOR;
+               [--]
+ID_GDDPDTOG    [Prompt for descriptions]^C^CGDD-DESCRIPTIONPROMPTTOGGLE;
+ID_GDDPDSET    [Current automatic descriptions]^C^CGDD-DESCRIPTIONS;
+ID_GDDCPTOG    [Prompt for connection placement]^C^CGDD-PLACEMENTPROMPTTOGGLE;
+ID_GDDCPMAX    [Maximum manual prompts]^C^CGDD-PLACEMENTPROMPTMAX;
+ID_GDDPMZTOG   [Enable Z on Move Point]^C^CGDD-ZMOVETOGGLE;
+
+***TOOLBARS
+
+***HELPSTRINGS
+ID_GDDPMZTOG   [Toggle whether to move the Z coordinate of points when moving points]
+ID_GDDCRVMI    [Set the curve error at 1.0]
+ID_GDDIPSE     [Single Point by Distance.  Inserts a single point by distance up from another point.]
+ID_GDDIC       [Insert a Connection]
+ID_GDDUP       [Update points to match display elevations and connections to match updated points.]
+ID_GDDCRVS     [Set the curve error per user input]
+ID_GDDCPMAX    [Maximum # of connectors to prompt for manual placement in one operation.]
+ID_GDDES       [Edit the slope by selection]
+ID_GDDPDTOG    [Turn off or on the prompt for descriptions when inserting points.]
+ID_GDDRP       [Raise or Lower a Point by Specified Amount (- is down)]
+ID_GDDCRBC     [Set Custom Curb.]
+ID_GDDCRB4     [Set 4" Curb.]
+ID_GDDPDSET    [Set the current descriptions to be used when inserting points.]
+ID_GDDCRVMA    [Set the curve error at 0.001]
+ID_GDDAVGE     [Set Average Project Elevation.]
+ID_GDDSETUP    [Set up or change running program variables.]
+ID_GDDMP       [Move a point horizontally to another location]
+ID_GDDCRB6     [Set 6" Curb.]
+ID_GDDIPS      [IPS.  Inserts a single point with user options.]
+ID_GDDIPDS     [Double Point By Slope.  Inserts a double point by slope from another point.]
+ID_GDDIPD      [IPS.  Inserts a double point with user options.]
+ID_GDDCPTOG    [Prompt for connection placement]
+ID_GDDIPSS     [Single Point By Slope.  Inserts a single point by slope from another point.]
+ID_GDDIPDE     [Double Point by Distance.  Inserts a double point by distance up from another point.]
+
+//
+//      End of AutoCAD menu file - C:\Design Center\GDD 1.0\gdd.mnu
+//
+

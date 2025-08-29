@@ -1,0 +1,19 @@
+
+
+FATAL ERROR:  Unhandled Access Violation Writing 0x7fef2000 Exception at 5f1af63fh
+
+12/21/2007 at 11:14:22.644  Drawing: \\EMACHINET6212\My Documents\Tom\tghpe\0711\dwgs\0711sh02.dwg
+-------------
+
+
+FATAL ERROR: Unhandled Access Violation Reading 0x6e006900 Exception at 6e006900h
+
+01/24/2011 at 17:03:26.426 drawing: 
+-------------
+
+
+FATAL ERROR: Unimplemented AcRxClass::copyFrom() function invoked.
+
+
+02/19/2011 at 17:33:11.115 drawing: 
+-------------

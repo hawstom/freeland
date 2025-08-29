@@ -1,0 +1,57 @@
+//
+//      GeoTables Menu
+//      July 2008
+//
+//      Copyright (C) 2008 by Thomas Gail Haws
+//
+//  This menu is free software under the terms of the
+//  GNU (GNU--acronym for Gnu's Not Unix--sounds like canoe)
+//  General Public License as published by the Free Software Foundation,
+//  version 2 of the License.
+// 
+//  You can redistribute this software for any fee or no fee and/or
+//  modify it in any way, but it and ANY MODIFICATIONS OR DERIVATIONS
+//  continue to be governed by the license, which protects the perpetual
+//  availability of the software for free distribution and modification.
+// 
+//  You CAN'T put this code into any proprietary package.  Read the license.
+// 
+//  If you improve this software, please make a revision submittal to the
+//  copyright owner at hawstom@despammed.com or see www.hawsedc.com.
+// 
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License on the World Wide Web for more details.
+//
+//
+//      NOTE:  AutoCAD looks for an ".mnl" (Menu Lisp) file whose name is
+//             the same as that of the menu file, and loads it if
+//             found.  If you modify this menu and change its name, you
+//             should copy cnm.mnl to <yourname>.mnl, since the menu
+//             relies on AutoLISP routines found there.
+//
+
+//
+//      Default GeoTables NAMESPACE declaration:
+//
+
+***MENUGROUP=GEOTABLES
+
+//
+//   Begin Geotables Toolbars
+//
+
+***TOOLBARS
+**TB_CRVS
+**CNM
+ID_CRVSTB       [_Toolbar("GeoTables", _Top, _Show, 1, 0, 1)]
+ID_CRVSCN     [_Button("GeoTables", "geotableslabel.bmp", "geotableslabel.bmp")]^C^C_crvs-gt 
+
+***HELPSTRINGS
+ID_CRVSCN     Creates tables for selected geometry: GEOTABLES 
+
+//
+//      End of GeoTables menu file
+//
+

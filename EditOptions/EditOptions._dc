@@ -1,0 +1,23 @@
+OptionsDCL : dialog {
+  key = "Title";
+  label = "";
+  : boxed_column {
+    label = "Select a variable to change";
+    : list_box {
+      key = "List1";
+      height = 6.27;
+      fixed_height = true;
+      width = 32.92;
+      tabs = "0 20 40";
+      fixed_width = true;
+    }
+    spacer;
+    : edit_box {
+      key = "Edit1";
+      edit_width = 26.42;
+      fixed_width = true;
+    }
+  }
+  spacer;
+  ok_only;
+}//MyMultiLists

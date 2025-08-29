@@ -1,0 +1,13 @@
+;;;     geotables.MNL
+;;;     Copyright (C) 2001 by Thomas Gail Haws
+;;;
+;;;     Created 2/21/97 by Dominic Panholzer
+;;;
+;;;
+;;;     This file is loaded automatically following the menu CNM.
+
+;;;The following lines load the GeoTables functions.
+(load "geotablestables.lsp")
+
+(prompt "\nGeotables menu utilities loaded.")
+(princ)

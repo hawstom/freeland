@@ -1,0 +1,87 @@
+//
+//      Grading and Drainage Designer Menu
+//
+//      Copyright (C) 2005 by David O. Wilkins
+//
+//      This is free software under the terms of the GNU GPL
+//
+//
+//      NOTE:  AutoCAD looks for an ".mnl" (Menu Lisp) file whose name is
+//             the same as that of the menu file, and loads it if
+//             found.  If you modify this menu and change its name, you
+//             should copy gdd.mnl to <yourname>.mnl, since the menu
+//             relies on AutoLISP routines found there.
+//
+//
+//      Default Grading and Drainage Designer NAMESPACE declaration:
+//
+
+***MENUGROUP=GDD
+
+//
+//   Begin Grading and Drainage Designer Pull-down Menus
+//
+***POP1
+              [&GDD]
+               [->Settings]
+ID_GDDSETUP       [General Setup]^C^CGDD-SETUP 
+ID_GDDAVGE        [Set Avg Elev]^C^CGDD-AVERAGEELEVATION 
+ID_GDDCRVMI       [Long Curve Segments]^C^CGDD-CURVEERROR 1.0
+ID_GDDCRVMA       [Short Curve Segments]^C^CGDD-CURVEERROR 0.01
+ID_GDDCRVS        [Customize Curve Segments]^C^CGDD-CURVEERROR 
+                 [--]
+ID_GDDCRB6        [Set 6" Curb]^C^CGDD-CURBHEIGHT 0.5 
+ID_GDDCRB4        [Set 4" Curb]^C^CGDD-CURBHEIGHT 0.33 
+ID_GDDCRBC        [<-Set Custom Curb]^C^CGDD-CURBHEIGHT 
+               [--]
+ID_GDDIPS       [Insert &Single Point	IPS]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Prompt");GDD-INSERTPOINTSINGLE;
+ID_GDDIPSS      [Single Point By S&lope	IPSS]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Object");(GDD-SETVAR "OBJECTADD" "0");(GDD-SETUP "Slope");\GDD-INSERTPOINTSINGLE;
+ID_GDDIPSE      [Single Point By Elev Up/Down	IPSE]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Object");(GDD-SETVAR "OBJECTSLOPE" "0");(GDD-SETUP "ADdition");\GDD-INSERTPOINTSINGLE;
+               [--]
+ID_GDDIPD       [Insert Double Point IPD]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Prompt");GDD-INSERTPOINTDOUBLE;
+ID_GDDIPDS      [Double Point By Slope	IPDS]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Object");(GDD-SETVAR "OBJECTADD" "0");(GDD-SETUP "Slope");\GDD-INSERTPOINTDOUBLE;
+ID_GDDIPDE      [Double Point By Elev Up/Down	IPDE]^C^C(GDD-SETVAR "POINTREFERENCETYPE" "Object");(GDD-SETVAR "OBJECTSLOPE" "0");(GDD-SETUP "ADdition");\GDD-INSERTPOINTDOUBLE;
+               [--]
+ID_GDDRP        [Raise/Lower Point]^C^CGDD-RAISEPOINTS;
+ID_GDDMP        [Relocate Point]^C^CGDD-MOVEPOINTS;
+ID_GDDUP        [Update Points and Connections]^C^CGDD-UPDATE;
+ID_GDDES        [Edit Elevationa by Slope]^C^CEDITSLOPE;
+ID_GDDIC        [Insert Slope]^C^CGDD-INSERTCONNECTOR;       
+               [--]
+ID_GDDPDTOG     [Prompt for descriptions]^C^CGDD-DESCRIPTIONPROMPTTOGGLE;
+ID_GDDPDSET     [Current automatic descriptions]^C^CGDD-DESCRIPTIONS;
+ID_GDDCPTOG     [Prompt for connection placement]^C^CGDD-PLACEMENTPROMPTTOGGLE;
+ID_GDDCPMAX     [Maximum manual prompts]^C^CGDD-PLACEMENTPROMPTMAX;
+ID_GDDPMZTOG   [Enable Z on Move Point]^C^CGDD-ZMOVETOGGLE;
+
+
+***HELPSTRINGS
+ID_GDDIPS       [IPS.  Inserts a single point with user options.]
+ID_GDDIPSS      [Single Point By Slope.  Inserts a single point by slope from another point.]
+ID_GDDIPSE      [Single Point by Distance.  Inserts a single point by distance up from another point.]
+ID_GDDSETUP     [Set up or change running program variables.]
+ID_GDDAVGE      [Set Average Project Elevation.]
+ID_GDDCRVMI     [Set the curve error at 1.0]
+ID_GDDCRVMA     [Set the curve error at 0.001]
+ID_GDDCRVS      [Set the curve error per user input]
+ID_GDDIPD       [IPD.  Inserts a double point with user options.]
+ID_GDDIPDS      [Double Point By Slope.  Inserts a double point by slope from another point.]
+ID_GDDIPDE      [Double Point by Distance.  Inserts a double point by distance up from another point.]
+ID_GDDCRB6      [Set 6" Curb.]
+ID_GDDCRB4      [Set 4" Curb.]
+ID_GDDCRBC      [Set Custom Curb.]
+ID_GDDRP        [Raise or Lower a Point by Specified Amount (- is down)]
+ID_GDDMP        [Move a point horizontally to another location]
+ID_GDDUP        [Update points to match display elevations and connections to match updated points.]
+ID_GDDPDTOG     [Turn off or on the prompt for descriptions when inserting points.]
+ID_GDDPDSET     [Set the current descriptions to be used when inserting points.]
+ID_GDDCPTOG     [Prompt for connection placement]
+ID_GDDCPMAX     [Maximum # of connectors to prompt for manual placement in one operation.]
+ID_GDDPMZTOG    [Toggle whether to move the Z coordinate of points when moving points]
+ID_GDDES        [Edit the slope by selection]
+ID_GDDIC        [Insert a Connection]
+
+
+//
+//      End of Grading and Drainage Designer menu file
+//

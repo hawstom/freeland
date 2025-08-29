@@ -1,0 +1,26 @@
+(princ "Grading and Drainage Designer...")
+(load "gdd")
+;;; Place the GDD pulldown to the left of the last pulldown already loaded
+;;;     Created 2/21/97 by Dominic Panholzer
+
+(defun GDD-PlaceGDDMenu (/ CNT)
+  (setq CNT 1)
+  (while (< CNT 24)
+    (if (menucmd (strcat "P" (itoa CNT) ".1=?"))
+      (setq CNT (1+ CNT))
+      (progn
+        (if (> CNT 2)
+          (setq CNT (1- CNT))
+          (setq CNT 2)
+        )
+        (menucmd (strcat "p" (itoa CNT) "=+GDD.pop1"))
+        (setq CNT 25)
+      )
+    )
+  )
+)
+
+;;(if (not(gdd-icad-p))(gdd-PlaceGDDMenu)) ;Do it if not in icad
+
+(princ "loaded.")
+(princ)

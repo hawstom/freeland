@@ -1,0 +1,81 @@
+;JOB  :SAMPLE        FILE: CONSTNOT.TXT
+;SAMPLE CONSTRUCTION NOTES
+;
+;--------------------------------------------------------------------------
+;This section shows how to override program size/scale defaults
+;if you want to use a custom sized notes table.
+;To use overrides, change the NOTEQTY block to meet your needs, then
+;remove the semi-colon from any of the SET lines below that need 
+;to be changed, and adjust their values to fit your custom block.
+;TXTHT is in AutoCAD units.
+;The other values are text height multiples.
+;You may remove this section from this file without hurting NOTES.
+;Note: Notes table column width is iniwid+ntwid+tqwid+quwid+finwid
+;SET TXTHT 20         AutoCAD text size (height)
+;SET TNWID 5          Width from middle of shape type to number (tally table only)
+;SET INIWID 2.5       Width from left edge of column to middle of number
+;SET NDWID 2.5        Width from middle of number to left point of description text
+;SET DQWID 56         Width from left point of description text to right point of quantity
+;SET QQWID 9          Width from right point of quantity to right point of next quantity
+;SET QUWID 1          Width from right point of quantity to left point of unit
+;SET FINWID 3         Width from left point of unit to right edge of column
+;SET LINSPC 3         Line spacing (row height)
+;The following settings are required if you are using aliases 
+;for the phase attributes in your NOTEQTY block.
+;Remove the semi-colon, and place the setting for each phase as shown below.
+;Type the alias for the appropriate phase into the NOTEPHASE attribute of each bubble note.
+SET PHASEALIAS 1 M   The TBLQTY1 tagged attribute of the NOTEQTY block will receive quantities from bubble notes with an M instead of a 1 in the NOTEPHASE attribute value
+SET PHASEALIAS 2 1   The TBLQTY2 tagged attribute of the NOTEQTY block will receive quantities from bubble notes with an 1 instead of a 2 in the NOTEPHASE attribute value
+;SET PHASEALIAS 3 2   The TBLQTY3 tagged attribute of the NOTEQTY block will receive quantities from bubble notes with an 3 in the NOTEPHASE attribute value
+;SET PHASEALIAS 4 3   The TBLQTY4 tagged attribute of the NOTEQTY block will receive quantities from bubble notes with an 4 in the NOTEPHASE attribute value
+;--------------------------------------------------------------------------
+;
+NUM  |<------------------------- DESCRIPTION ----------------------UN|QTY>
+;    The first three letters of the following line match 
+;    the three letter note shape name for the subsequent notes.
+BOX NOTES
+;    The next line gives a title that is added to the notes list if there
+;    are any box notes in the drawing.
+TITLE PAVING NOTES
+1    SAWCUT                                                        LF LINE1
+2    MONUMENT                                                      EA COUNT
+;
+CIR NOTES
+TITLE
+TITLE WATER NOTES
+TITLE
+1    8" WATER                                                      LF LINE2
+2    VALVE                                                         EA COUNT
+
+DIAMOND NOTES
+TITLE SEWER NOTES
+1    8" SEWER                                                      LF LINE1
+     adsasdfjasldjf
+     asdfasdfasdf
+2    MANHOLE                                                       EA COUNT
+     ahga  aha!!!
+ELLIPSE NOTES
+TITLE STORM DRAIN
+1    18" STORM DRAIN                                               LF LINE1
+2    HEADWALL                                                      EA COUNT
+;
+HEX SHAPED NOTES
+TITLE IRRIGAITION
+1    CONNECT TO EXISTING                                           NPI
+2    2" VALVE                                                      EA COUNT
+;
+OCTAGON NOTES
+TITLE TRAFFIC NOTES
+1    2" CONDUIT                                                    LF LINE2
+2    STOP SIGN                                                     EA COUNT
+;
+PENTAGON NOTES
+TITLE STREET LIGHTING NOTES
+1    2" CONDUIT                                                    LF LINE1
+2    LUMINAIRE                                                     EA COUNT
+;
+RECTANGLE NOTES
+TITLE WORK BY OTHERS
+1    POWER POLE RELOCATION BY ELECTRIC CO.                         NPI
+2    WATER LINE REALIGNMENT BY CITY CREWS                          NPI
+

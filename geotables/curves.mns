@@ -1,0 +1,18 @@
+//
+//      AutoCAD menu file - C:\Documents and Settings\Owner\My Documents\Tom\freeland\curves\curves.mnu
+//
+
+***MENUGROUP=CURVES
+
+***TOOLBARS
+**TB_CRVS
+**CNM
+**CURVES
+ID_CRVSTB      [_Toolbar("CURVES", _Top, _Show, 1, 0, 1)]
+ID_CRVSCN      [_Button("Curve Table Creator", "curvescn.bmp", "curvescn.bmp")]^C^C_curves 
+
+
+//
+//      End of AutoCAD menu file - C:\Documents and Settings\Owner\My Documents\Tom\freeland\curves\curves.mnu
+//
+

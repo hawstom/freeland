@@ -1,0 +1,17 @@
+ren vehicleliba-bus.dwg turn-a-bus.dwg
+ren vehiclelibbus-40.dwg turn-bus-40.dwg
+ren vehiclelibbus-45.dwg turn-bus-45.dwg
+ren vehiclelibcity-bus.dwg turn-city-bus.dwg
+ren vehiclelibmh.dwg turn-mh.dwg
+ren vehiclelibmhb.dwg turn-mhb.dwg
+ren vehiclelibp.dwg turn-p.dwg
+ren vehiclelibpb.dwg turn-pb.dwg
+ren vehiclelibpt.dwg turn-pt.dwg
+ren vehiclelibs-bus-36.dwg turn-s-bus-36.dwg
+ren vehiclelibs-bus-40.dwg turn-s-bus-40.dwg
+ren vehiclelibsu.dwg turn-su.dwg
+ren vehiclelibwb-40.dwg turn-wb-40.dwg
+ren vehiclelibwb-50.dwg turn-wb-50.dwg
+ren vehiclelibwb-62.dwg turn-wb-62.dwg
+ren vehiclelibwb-65.dwg turn-wb-65.dwg
+ren vehiclelibwb-67.dwg turn-wb-67.dwg

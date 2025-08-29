@@ -1,0 +1,36 @@
+;;;     CURVES.MNL
+;;;     Copyright (C) 2001 by Thomas Gail Haws
+;;;
+;;;     Created 2/21/97 by Dominic Panholzer
+;;;
+;;;
+;;;     This file is loaded automatically following the menu CNM.
+
+
+
+; Place the CNM pulldown to the left of the last pulldown already loaded
+
+(defun hcnm-PlaceCTCMenu (/ CNT)
+  (setq CNT 1)
+  (while (< CNT 24)
+    (if (menucmd (strcat "P" (itoa CNT) ".1=?"))
+      (setq CNT (1+ CNT))
+      (progn
+        (if (> CNT 2)
+          (setq CNT (1- CNT))
+          (setq CNT 2)
+        )
+        (menucmd (strcat "p" (itoa CNT) "=+CURVES.pop1"))
+        (setq CNT 25)
+      )
+    )
+  )
+)
+
+(hcnm-PlaceCTCMenu)
+
+;;;The following lines load the CNM functions.
+(load "curvetables.lsp")
+
+(prompt "\nCurve Table Creator menu utilities loaded.")
+(princ)
