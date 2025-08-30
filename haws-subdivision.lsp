@@ -8,43 +8,6 @@
 
 ;; Customizable out-of-the-box defaults you can edit are at very end of file
 
-;;; Specialized Move, Copy, and Rotate command
-;;; Moves a selection set (A). Then puts a copy (B) at the original location. Then rotates the selection set (A).
-;;; Prompts for selection set, base point and base rotation, and repetitive destination point and rotation.
-(defun c:cccc () (c:haws-mocoro))
-(defun
-   c:haws-mocoro (/ basept baserot destpt destrot ss1)
-  (setq
-    ss1
-     (ssget)
-    basept
-     (getpoint
-       "\nSpecify base point (midpoint or endpoint of front of pad): "
-     )
-    baserot
-     (getangle
-       basept
-       "\nSpecify base rotation (midpoint or endpoint of back of pad):"
-     )
-  )
-  (while (setq destpt (getpoint "\nSpecify destination point: "))
-    (setq destrot (getangle destpt "\nSpecify destination rotation:"))
-    (command "._move" ss1 "" basept destpt)
-    (command "._copy" ss1 "" destpt basept)
-    (command
-      "._rotate"
-      ss1
-      ""
-      destpt
-      (* 180 (/ (- destrot baserot) pi))
-    )
-    (setq
-      basept destpt
-      baserot destrot
-    )
-  )
-  (princ)
-)
 ;;; Pad Elevate (PE) application
 ;;; Command aliases:
 ;;; ppp = PadElevate Sets a running row of pads by selecting alternately curb, pad, curb, pad, curb.
