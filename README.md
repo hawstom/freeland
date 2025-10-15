@@ -1,5 +1,5 @@
-# Welcome to FreeLAND
-Welcome to the FreeLAND suite of Civil Engineering tools started by Thomas Gail Haws. These tools are AutoCAD commands ready for AutoCAD users who have no knowledge of AutoLISP beyond how to load a file. Please contact me if you need any help using or modifying these tools.
+# Welcome to FreeLand
+Welcome to the FreeLand suite of Civil Engineering tools started by Thomas Gail Haws. These tools are AutoCAD commands ready for AutoCAD users who have no knowledge of AutoLISP beyond how to load a file. Please contact me if you need any help using or modifying these tools.
 
 # List of tools
 - Curve, Line, and Point Table Creator: You select arcs, lines, or points. It labels them and creates a table to present their geometry. Tables like this are used by Surveyors and Civil Engineers. See [at hawsedc.com](https://hawsedc.com/gnu/curvesauto) and [at Blogspot](https://tomsthird.blogspot.com/2015/01/geotables-free-curve-line-and-point.html).
