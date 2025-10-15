@@ -3,6 +3,7 @@
 ;;;
 ;;; Moves a selection set (A). Then puts a copy (B) at the original location. Then rotates the selection set (A).
 ;;; Prompts for selection set, base point and base rotation, and repetitive destination point and rotation.
+(princ "\nhaws-mocoro proliferator loaded. Type haws-mocoro or cccc to run it.")
 (defun c:cccc () (c:haws-mocoro))
 (defun
    c:haws-mocoro (/)
