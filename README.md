@@ -8,7 +8,7 @@ Welcome to the FreeLand suite of Civil Engineering tools started by Thomas Gail 
 - Grading and Drainage Designer: It helps you design site grading. It acts to some extent like Civil 3D feature lines. See [at hawsedc.com](https://hawsedc.com/gnu/gdd.php) and at wikia.com](https://autocad.fandom.com/wiki/Grading_and_Drainage_Designer_(AutoLISP_application)).
 - Profile Labeler: It helps you add labels productively to civil engineering profiles. See at [hawsedc.com](https://hawsedc.com/gnu/proflbl.php).
 - Sewer Lateral Importer: Commissioned by Apache Junction Sewer District to draw sewer laterals between two manholes based on a CSV file of video observations.
-- Sewer Lateral Repositioner: It moves a sewer lateral object to a new distance from the main line endpoint.
+- Sewer Lateral Repositioner: Commissioned by Apache Junction Sewer District to move a sewer lateral object to a new distance from the main line endpoint.
 - Subdivision Grading Plan Labeler: You enter the "average" project elevation. You select a controlling street elevation. It helps you label points on a lot that you select one at a time. See at [hawsedc.com](https://hawsedc.com/gnu/gradlbl.php).
 - Survey Points Importer: It inserts point blocks by importing points from a standard text file in a variety of formats. See at [hawsedc.com](https://hawsedc.com/gnu/pointsin.php).
 - Turning Path Tracker: You select a front wheel path polyline. It draws the resulting rear wheel paths and intermediate positions of a vehicle whose front wheels follow your polyline. See at [hawsedc.com](https://hawsedc.com/gnu/turn.php) and [Youtube](https://youtu.be/DmHMUyquoSI).
