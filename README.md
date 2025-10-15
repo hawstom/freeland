@@ -1,5 +1,5 @@
 # Welcome to FreeLand
-Welcome to the FreeLand suite of Civil Engineering tools started by Thomas Gail Haws. These tools are AutoCAD commands ready for AutoCAD users who have no knowledge of AutoLISP beyond how to load a file. Please contact me if you need any help using or modifying these tools.
+Welcome to the FreeLand suite of Civil Engineering tools started by Thomas Gail Haws. These tools are AutoCAD commands ready for AutoCAD users who have no knowledge of AutoLISP beyond how to load a file and look inside it for commands and comments. Please contact me if you need any help using or modifying these tools.
 
 # List of tools
 - Civil 3D Subdivision Lot Elevator: See at [Youtube](https://youtu.be/OkHoKr-nJKU).
