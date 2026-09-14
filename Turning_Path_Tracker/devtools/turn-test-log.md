@@ -1,7 +1,7 @@
 # TURN tracking kernel unit tests, drive kernel included
 
-Run at CDATE 20260913.234233
-AutoCAD 24.3s (LMS Tech) product AutoCAD
+Run at CDATE 20260914.011528
+AutoCAD 26.0s (LMS Tech) product AutoCAD
 
 
 ## Arcsine (1.1.x returned tan(asin x); the atan was missing)
@@ -233,13 +233,34 @@ AutoCAD 24.3s (LMS Tech) product AutoCAD
 - PASS and it is reported, even though the steering lock was never exceeded
 - reported: Jackknife: articulation behind Tractor reaches 93.6, limit is 70.0.
 
+## Steering toward a target point
+
+- PASS dead ahead needs no steer (expected ~0.000000, got 0.000000)
+- PASS a target 10 degrees to the left asks for 10 degrees (expected ~0.174533, got 0.174532)
+- PASS a target 10 degrees to the right asks for -10 (expected ~-0.174533, got -0.174532)
+- PASS a target square to the left is limited to the lock (expected ~0.523599, got 0.523599)
+- PASS and square to the right, to minus the lock (expected ~-0.523599, got -0.523599)
+- PASS a target directly behind still asks for full lock (expected ~0.523599, got 0.523599)
+- PASS a vehicle with no lock recorded is not clamped (expected ~1.570796, got 1.570796)
+
+## The cursor rule, replayed without a cursor
+
+- PASS 200 cursor events can never spend more than 200 steps
+- PASS the rig reaches a target dead ahead
+- arrived after 60 of 200 offered steps, then stopped
+- PASS and stops there, spending no further steps
+- PASS replaying the collected inputs lands in the same place (expected ~0.000000, got 0.000000)
+- PASS an unreachable cursor spends exactly one step per event, and returns (expected 500, got 500)
+- PASS the rig is still circling, not arrived
+- 500 events, 500 steps, no hang: the rig orbits a point it cannot reach
+
 ## A driven path is the same shape as a followed one
 
 - PASS one list of states per segment (expected 2, got 2)
 - PASS every segment has the same number of states
 - PASS the course length of a driven path is computable
 - PASS and equals the distance actually driven (expected ~40.000000, got 40.000000)
-- PASS wiki-turn-findings accepts a driven path
+- PASS turn-findings accepts a driven path
 - PASS 15 degrees of steer is inside a 30 degree lock, so no finding
 
 ## Steering past the lock is reported, not silently clamped
@@ -249,7 +270,7 @@ AutoCAD 24.3s (LMS Tech) product AutoCAD
 
 ## Summary
 
-- passed: 141
+- passed: 154
 - failed: 0
 
 **ALL CHECKS PASSED**

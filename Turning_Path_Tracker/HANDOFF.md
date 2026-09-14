@@ -80,8 +80,8 @@ AASHTO measures minimum turning radius from.
 
 ### Next build
 **Phase 4's command, `c:drive`.** The kernel half is done, tested and committed:
-`wiki-turn-drive-path` takes a list of (steer . travel) inputs and returns the same
-shape `wiki-turn-path` returns, so everything downstream already works on a driven
+`turn-drive-path` takes a list of (steer . travel) inputs and returns the same
+shape `turn-path` returns, so everything downstream already works on a driven
 rig. What is left is the interaction — a `grread` loop, and a decision about what the
 user sees while steering. The model is not the hard part any more.
 
@@ -96,9 +96,14 @@ from both the `;;; VERSION` banner and `general.version` to release.
   TAB, so either the replacement silently matches nothing or a tab lands in the file.
   Once was in the very handoff note warning about it. Use the Write and Edit tools for
   any content containing a backslash. No exceptions, no cleverness.
-- **Never end a `.scr` with a bare `quit`.** The "Save changes?" prompt is a modal
-  task dialog; no script line answers it, and the run holds an AutoCAD process
-  forever. Use `(tt-safe-quit)`. A leftover `acad.exe` is the symptom.
+- **Never leave a `.scr` to quit a dirty drawing.** QUIT then asks whether to save, at
+  the command line, and in an unattended run nothing answers it — not a following
+  script line (`y` or `n`), not `(command "._quit" "_N")`. All three park forever
+  holding an `acad.exe`. Leaving the drawing saved is the one thing that works;
+  `(turn-test-safe-quit)` does it. A leftover `acad.exe` is the symptom.
+  *(I first wrote this up as a modal dialog. Tom corrected it — he watched it happen
+  and it was at the command line. The table in `CLAUDE.md` is what was measured;
+  the mechanism is not established and does not need to be.)*
 - **Verify AutoLISP assumptions, do not reason about them.** `getenv` was assumed to
   read the environment the `.bat` hands to `acad.exe`. It does — but that was proven
   by running it on both products, not by arguing it.

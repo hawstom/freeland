@@ -1,7 +1,8 @@
-# Release smoke test: gnu/turn-2.0.0.lsp
+# Release smoke test: turn-2.0.0.lsp
 
-- PASS the shipped file exists
-- PASS reports version 2.0.0
+- PASS a shipped file exists
+- loaded version `2.0.0`
+- PASS the version is in the file name
 - PASS defines TURN
 - PASS defines BUILDVEHICLE
 - PASS defines the BV alias

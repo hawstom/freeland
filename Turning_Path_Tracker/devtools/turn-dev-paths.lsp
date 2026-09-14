@@ -6,7 +6,7 @@
 ;;; whole tree can be cloned anywhere by anyone and the tests still run.
 ;;;
 ;;; The .scr line that loads this file is therefore the only one that mentions
-;;; getenv. Everything after it says (tt-dev "x.lsp") or (tt-src "turn.lsp").
+;;; getenv. Everything after it says (turn-test-dev "x.lsp") or (turn-test-src "turn.lsp").
 ;;;
 ;;; Test scaffolding. None of it ships to users.
 
@@ -19,16 +19,16 @@
 
 (setq
   ;; devtools/ - the harness, the probes, the logs
-  *tt-dir*  (strcat (getenv "TURNDEV") "/")
+  *turn-test-dir*  (strcat (getenv "TURNDEV") "/")
   ;; Turning_Path_Tracker/ - the trunk: turn.lsp and its two .dat files
-  *tt-root* (strcat (getenv "TURNDEV") "/../")
+  *turn-test-root* (strcat (getenv "TURNDEV") "/../")
   ;; hawsedc.com/gnu/ - what users actually download
-  *tt-gnu*  (strcat (getenv "TURNDEV") "/../hawsedc.com/gnu/")
+  *turn-test-gnu*  (strcat (getenv "TURNDEV") "/../hawsedc.com/gnu/")
 )
 
-(defun tt-dev (f) (strcat *tt-dir* f))
-(defun tt-src (f) (strcat *tt-root* f))
-(defun tt-gnu (f) (strcat *tt-gnu* f))
+(defun turn-test-dev (f) (strcat *turn-test-dir* f))
+(defun turn-test-src (f) (strcat *turn-test-root* f))
+(defun turn-test-gnu (f) (strcat *turn-test-gnu* f))
 
 ;;; ---------------------------------------------------------------------------
 ;;; TRUSTEDPATHS
@@ -48,7 +48,7 @@
 ;;; trailing slash - then add only what is genuinely absent.
 ;;; ---------------------------------------------------------------------------
 
-(defun tt-split (s delim / c i out piece)
+(defun turn-test-split (s delim / c i out piece)
   (setq i 1 piece "" out nil)
   (while (<= i (strlen s))
     (setq c (substr s i 1))
@@ -61,7 +61,7 @@
   (reverse (cons piece out))
 )
 
-(defun tt-join (lst delim / out)
+(defun turn-test-join (lst delim / out)
   (if lst
     (progn
       (setq out (car lst))
@@ -73,8 +73,8 @@
 )
 
 ;; "C:/a/b/../c/" -> "C:\a\c"
-(defun tt-normalize (path / parts stack)
-  (setq parts (tt-split (vl-string-translate "/" "\\" path) "\\") stack nil)
+(defun turn-test-normalize (path / parts stack)
+  (setq parts (turn-test-split (vl-string-translate "/" "\\" path) "\\") stack nil)
   (foreach p parts
     (cond
       ((or (= p "") (= p ".")) nil)
@@ -82,17 +82,17 @@
       (t (setq stack (cons p stack)))
     )
   )
-  (tt-join (reverse stack) "\\")
+  (turn-test-join (reverse stack) "\\")
 )
 
-(defun tt-trust (path / canon current found)
+(defun turn-test-trust (path / canon current found)
   (setq
-    canon (tt-normalize path)
+    canon (turn-test-normalize path)
     current (getvar "TRUSTEDPATHS")
     found nil
   )
-  (foreach one (tt-split current ";")
-    (if (= (strcase (tt-normalize one)) (strcase canon)) (setq found T))
+  (foreach one (turn-test-split current ";")
+    (if (= (strcase (turn-test-normalize one)) (strcase canon)) (setq found T))
   )
   (if (not found)
     (setvar "TRUSTEDPATHS"
@@ -101,7 +101,7 @@
   )
 )
 
-(foreach p (list *tt-dir* *tt-root* *tt-gnu*) (tt-trust p))
+(foreach p (list *turn-test-dir* *turn-test-root* *turn-test-gnu*) (turn-test-trust p))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Quitting
@@ -114,7 +114,7 @@
 ;;; The only reliable exit is to leave the drawing SAVED, so QUIT has nothing to
 ;;; ask about. Every .scr therefore ends with two lines:
 ;;;
-;;;     (tt-safe-quit)
+;;;     (turn-test-safe-quit)
 ;;;     quit
 ;;;
 ;;; THE QUIT IS A SCRIPT LINE, NOT PART OF THE LISP. Calling (command "._quit")
@@ -122,14 +122,14 @@
 ;;; spurious "Function cancelled" every run - noise that would hide a real
 ;;; error. So the LISP only makes quitting safe; the script does the quitting.
 ;;; ---------------------------------------------------------------------------
-(defun tt-safe-quit (/ scratch)
-  ;; Only save if there is something to save. A suite that ended in tt-finish
+(defun turn-test-safe-quit (/ scratch)
+  ;; Only save if there is something to save. A suite that ended in turn-test-finish
   ;; has already written its drawing, leaving DBMOD 0; saving again over the
   ;; file that IS the current drawing fails and logs a spurious "Function
   ;; cancelled", which is exactly the kind of noise that hides a real error.
   (if (/= 0 (getvar "DBMOD"))
     (progn
-      (setq scratch (strcat *tt-dir* "turn-scratch.dwg"))
+      (setq scratch (strcat *turn-test-dir* "turn-scratch.dwg"))
       (vl-file-delete scratch)
       ;; SAVEAS rather than QSAVE: it takes a name whether or not the drawing
       ;; already has one. "" accepts the default file format.

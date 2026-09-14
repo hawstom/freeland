@@ -27,14 +27,14 @@
 ;;;
 ;;; Reads each drawing with ObjectDBX rather than opening it: no SDI, no
 ;;; drawing swaps, no save prompts, one session. Dumps raw tags - it does not
-;;; interpret them through wiki-turn-vehicle-from-attributes, because the
+;;; interpret them through turn-vehicle-from-attributes, because the
 ;;; question is precisely what the raw tags are.
 
 (vl-load-com)
 
 (setq
-  *pb-log* (tt-dev "turn-probe-aashto-log.md")
-  *pb-files*
+  *turn-probe-aashto-log* (turn-test-dev "turn-probe-aashto-log.md")
+  *turn-probe-aashto-files*
    (list
      ;; 2004 edition, as published. Byte-identical to the repo's 1.1.7.1
      ;; Vehicle_Library drawings - md5 confirmed on all 17 - so this is also a
@@ -61,21 +61,21 @@
    )
 )
 
-(defun pb-say (s / f)
-  (setq f (open *pb-log* "a"))
+(defun turn-probe-aashto-say (s / f)
+  (setq f (open *turn-probe-aashto-log* "a"))
   (write-line s f)
   (close f)
   (princ (strcat "\n" s))
   (princ)
 )
 
-(defun pb-num (x) (rtos x 2 4))
-(defun pb-pt (p)
-  (strcat "(" (pb-num (car p)) ", " (pb-num (cadr p)) ")")
+(defun turn-probe-aashto-num (x) (rtos x 2 4))
+(defun turn-probe-aashto-pt (p)
+  (strcat "(" (turn-probe-aashto-num (car p)) ", " (turn-probe-aashto-num (cadr p)) ")")
 )
 
 ;; An ObjectDBX document for whatever release this is.
-(defun pb-dbx (/ doc v)
+(defun turn-probe-aashto-dbx (/ doc v)
   (setq v 16)
   (while (and (not doc) (< v 30))
     (setq
@@ -94,7 +94,7 @@
 ;; Loose ATTDEFs in any block definition, plus ATTRIBs on any model space
 ;; insert. The 1.1.7.1 drawings never got as far as BLOCK - their ATTDEFs sit
 ;; in *Model_Space - so both have to be looked at.
-(defun pb-attributes (dbx / atts)
+(defun turn-probe-aashto-attributes (dbx / atts)
   (vlax-for blk (vla-get-blocks dbx)
     (vlax-for obj blk
       (if (= "AcDbAttributeDefinition" (vla-get-objectname obj))
@@ -134,7 +134,7 @@
 
 ;; Every circle in the drawing, wherever it lives. The alignment marker is one
 ;; of these, and its position against the axle geometry is the whole question.
-(defun pb-circles (dbx / found)
+(defun turn-probe-aashto-circles (dbx / found)
   (vlax-for blk (vla-get-blocks dbx)
     (vlax-for obj blk
       (if (= "AcDbCircle" (vla-get-objectname obj))
@@ -151,33 +151,33 @@
   (reverse found)
 )
 
-(defun pb-report (label file / atts circles dbx err tag)
-  (pb-say "")
-  (pb-say (strcat "## " label))
-  (pb-say "")
-  (setq dbx (pb-dbx))
+(defun turn-probe-aashto-report (label file / atts circles dbx err tag)
+  (turn-probe-aashto-say "")
+  (turn-probe-aashto-say (strcat "## " label))
+  (turn-probe-aashto-say "")
+  (setq dbx (turn-probe-aashto-dbx))
   (cond
-    ((not dbx) (pb-say "!! could not create an ObjectDBX document"))
+    ((not dbx) (turn-probe-aashto-say "!! could not create an ObjectDBX document"))
     ((vl-catch-all-error-p
        (setq err (vl-catch-all-apply 'vla-open (list dbx file)))
      )
-     (pb-say (strcat "!! vla-open failed: " (vl-catch-all-error-message err)))
+     (turn-probe-aashto-say (strcat "!! vla-open failed: " (vl-catch-all-error-message err)))
     )
     (t
-     (setq atts (pb-attributes dbx))
-     (pb-say (strcat "Attributes found: " (itoa (length atts))))
-     (pb-say "")
-     (pb-say "| Tag | Value | Where |")
-     (pb-say "|---|---|---|")
+     (setq atts (turn-probe-aashto-attributes dbx))
+     (turn-probe-aashto-say (strcat "Attributes found: " (itoa (length atts))))
+     (turn-probe-aashto-say "")
+     (turn-probe-aashto-say "| Tag | Value | Where |")
+     (turn-probe-aashto-say "|---|---|---|")
      (foreach a atts
-       (pb-say
+       (turn-probe-aashto-say
          (strcat "| " (car a) " | " (cadr a) " | " (caddr a) " |")
        )
      )
-     (pb-say "")
+     (turn-probe-aashto-say "")
      ;; The question that decides whether TURN 1.1.17 draws a trailer at all.
      (setq tag (assoc "TRAILHAVE" atts))
-     (pb-say
+     (turn-probe-aashto-say
        (cond
          ((not tag) "VERDICT TrailHave: **ABSENT** - TURN 1.1.17 will not draw a trailer.")
          ((= (strcase (cadr tag)) "YES")
@@ -190,13 +190,13 @@
          )
        )
      )
-     (pb-say "")
-     (setq circles (pb-circles dbx))
-     (pb-say (strcat "Circles found: " (itoa (length circles))))
+     (turn-probe-aashto-say "")
+     (setq circles (turn-probe-aashto-circles dbx))
+     (turn-probe-aashto-say (strcat "Circles found: " (itoa (length circles))))
      (foreach c circles
-       (pb-say
-         (strcat "- centre " (pb-pt (car c))
-                 "  radius " (pb-num (cadr c))
+       (turn-probe-aashto-say
+         (strcat "- centre " (turn-probe-aashto-pt (car c))
+                 "  radius " (turn-probe-aashto-num (cadr c))
                  "  in " (caddr c)
          )
        )
@@ -207,18 +207,18 @@
   (princ)
 )
 
-(defun pb-run (/ f)
-  (setq f (open *pb-log* "w"))
+(defun turn-probe-aashto-run (/ f)
+  (setq f (open *turn-probe-aashto-log* "w"))
   (close f)
-  (pb-say "# AASHTO published vehicle block probe")
-  (pb-say "")
-  (pb-say "Raw ObjectDBX read of the vehicle blocks published at hawsedc.com/gnu/turn.php.")
-  (pb-say "Question: does WB-67 carry TrailHave=\"Yes\", and where is the alignment circle?")
-  (foreach pair *pb-files* (pb-report (car pair) (cdr pair)))
-  (pb-say "")
-  (pb-say "END OF PROBE")
+  (turn-probe-aashto-say "# AASHTO published vehicle block probe")
+  (turn-probe-aashto-say "")
+  (turn-probe-aashto-say "Raw ObjectDBX read of the vehicle blocks published at hawsedc.com/gnu/turn.php.")
+  (turn-probe-aashto-say "Question: does WB-67 carry TrailHave=\"Yes\", and where is the alignment circle?")
+  (foreach pair *turn-probe-aashto-files* (turn-probe-aashto-report (car pair) (cdr pair)))
+  (turn-probe-aashto-say "")
+  (turn-probe-aashto-say "END OF PROBE")
   (princ)
 )
 
-(princ "\nturn-probe-aashto.lsp loaded. Run (pb-run).")
+(princ "\nturn-probe-aashto.lsp loaded. Run (turn-probe-aashto-run).")
 (princ)

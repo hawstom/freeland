@@ -1,18 +1,18 @@
 # TURN 2.0.0 — punch list
 
-**Status 2026-09-13: ten of eleven items are automated and passing. Two remain
-yours, and they are the two that matter most.**
+**Status 2026-09-14: the punch list is CLOSED.** Ten of eleven items are automated
+and passing; the eleventh was a review and Tom has done it.
 
     devtools\turn-tests.bat turn-punch-tests          # items 1, 4, 5, 6, 8, 9, 10, 11 — 53 checks
     devtools\turn-tests.bat turn-curve-tests c3d c3d  # item 7 — 30 checks
 
-**Still yours: items 2 and 3 — do the BUILDVEHICLE prompts read clearly?**
-Specifically whether a user can tell the tractor's rear-hitch question from the
-trailer's kingpin question. Answering those two prompts the same way is what
-produced the original bug report. A harness can answer a prompt; it cannot judge
-its wording. Item 2 also carries a real decision: whether to keep offering 30°
-steering lock and 70° articulation as defaults, or default to 0 and stay silent
-rather than stand behind numbers we did not measure.
+**Items 2 and 3 are settled — Tom reviewed them 2026-09-14: "The prompts are
+fine, and you can use those angles."**
+
+So the whole punch list is closed. The prompt wording stands as written, and
+**30° steering lock / 70° articulation stay as BUILDVEHICLE's defaults** — real
+enough to drive a verdict, unlike the 28.6479 placeholder 1.1.x wrote. Do not
+relitigate either.
 
 The hand-test text below is kept as the description of what each item means.
 
@@ -45,13 +45,13 @@ bite users who unzip to a random folder.
 
 **Do:** APPLOAD or drag `turn-2.0.0.lsp` in.
 
-**Expect:** `TURN 2.0.0 loaded. Type TURN or BV.`
+**Expect:** `TURN <version> loaded. Type TURN, DRIVE or BV.`
 
-- [x] Banner says 2.0.0
+- [x] Banner says the version, and it matches the file header
 
 ---
 
-## 2. BUILDVEHICLE — single unit, and a look at the prompts
+## 2. BUILDVEHICLE — single unit, and a look at the prompts — REVIEWED 2026-09-14
 
 **Do:** `BV`. Answer for an SU: name `SU`, body 30, width 8, front overhang 4,
 wheelbase 20, track 8, steering lock — take the default.
@@ -78,19 +78,19 @@ not check" and keeps the analysis silent until someone supplies a real figure. *
 do you want?** A confident wrong verdict is worse than none, and that is your call, not
 mine.
 
-- [ ] Decide: 30/70 defaults, or 0 and stay silent
+- [x] Decided: **keep the 30/70 defaults**
 
 Compare against 1.1.17, which asked *"Half of maximum axel width to middle of
 wheels"* and silently doubled it. 2.0 asks for the whole width and takes it at face
 value.
 
-- [ ] Prompts read clearly
-- [ ] Nothing asks for a half-dimension
-- [ ] A block is drawn, with the dimensions on it as attributes
+- [x] Prompts read clearly
+- [x] Nothing asks for a half-dimension
+- [x] A block is drawn, with the dimensions on it as attributes
 
 ---
 
-## 3. BUILDVEHICLE — one trailer. The two prompts Kenya could not tell apart.
+## 3. BUILDVEHICLE — one trailer. The two prompts Kenya could not tell apart. — REVIEWED 2026-09-14
 
 **Do:** `BV` again, WB-67 figures: body 27.92, width 8, overhang 4, wheelbase 19.5,
 track 8. Answer **Yes** to the trailer question.
@@ -113,12 +113,12 @@ Does Trailer1 tow another trailer? [Yes/No]:
 
 Three things to check, all of which cost Kenya a week in 1.1.17:
 
-- [ ] **The two hitch questions are now distinguishable.** One says "How far BEHIND
+- [x] **The two hitch questions are now distinguishable.** One says "How far BEHIND
       *&lt;name&gt;*'s rear axle", the other says "THIS trailer's own wheelbase".
       Kenya answered both 45.5 and got a spiral.
-- [ ] **The hitch defaults to 0**, which is right for a fifth wheel over the drive
+- [x] **The hitch defaults to 0**, which is right for a fifth wheel over the drive
       axle. She had to guess.
-- [ ] **Nothing asks for a negative.** 1.1.17 said "forward is NEGATIVE" and she
+- [x] **Nothing asks for a negative.** 1.1.17 said "forward is NEGATIVE" and she
       typed 3 instead of -3. 2.0 asks how far it reaches FORWARD and takes a positive.
 
 For a WB-67 answer: hitch 0, trailer wheelbase 45.5, track 8.5, nose forward 3,
@@ -258,16 +258,16 @@ Then uncomment the **LEGACY NAMES** block at the bottom of the file and run agai
 - [x] Layers still created with built-in names
 - [x] Everything still draws
 
-(Automated as `ttc-test-no-data-files`, 8 checks — but worth seeing once by hand,
+(Automated as `turn-test-kernel-no-data-files`, 8 checks — but worth seeing once by hand,
 since it is the FreeLand premise: one file, downloaded and loaded.)
 
 ---
 
-## What I could not test for you
+## What a harness still cannot tell you
 
-- **Anything about how the prompts *read*.** The harness can answer them; it cannot
-  tell me they make sense. That is item 2 and 3 and it is the main thing I want your
-  eye on.
+- ~~**Anything about how the prompts *read*.**~~ Reviewed 2026-09-14: fine as
+  written. A harness still cannot judge wording, so any future change to a prompt
+  needs a human to read it again.
 - ~~**Civil 3D alignments.**~~ Done 2026-09-13. Run against a real `AECC_ALIGNMENT`;
   see item 7.
 - **The trusted-path prompt on first load.** See Setup.

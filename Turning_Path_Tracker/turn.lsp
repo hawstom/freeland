@@ -23,8 +23,8 @@
 ;;;
 ;;; NEW IN 2.1.0: drive mode. The kernel can be driven a step at a time from a
 ;;; steer angle and a travel distance, instead of only following a course that
-;;; was drawn first. wiki-turn-drive-path returns the same shape as
-;;; wiki-turn-path, so the envelope, the findings and the report all work on a
+;;; was drawn first. turn-drive-path returns the same shape as
+;;; turn-path, so the envelope, the findings and the report all work on a
 ;;; driven rig unchanged.
 ;;; ===========================================================================
 ;;;
@@ -112,7 +112,7 @@
 ;;; keep working. Segments 2 and up extend the same pattern.
 
 (setq
-  *wiki-turn-settings*
+  *turn-settings*
    (list
      ;;-----------------------------------------------------------------------
      ;; Program settings users can edit
@@ -139,24 +139,24 @@
    )
 )
 
-(defun wiki-turn-setvar (var val)
+(defun turn-setvar (var val)
   (setq var (strcase var t))
-  (if (assoc var *wiki-turn-settings*)
+  (if (assoc var *turn-settings*)
     (setq
-      *wiki-turn-settings*
+      *turn-settings*
        (subst
-         (list var val (caddr (assoc var *wiki-turn-settings*)))
-         (assoc var *wiki-turn-settings*)
-         *wiki-turn-settings*
+         (list var val (caddr (assoc var *turn-settings*)))
+         (assoc var *turn-settings*)
+         *turn-settings*
        )
     )
-    (setq *wiki-turn-settings* (cons (list var val 'str) *wiki-turn-settings*))
+    (setq *turn-settings* (cons (list var val 'str) *turn-settings*))
   )
   val
 )
 
-(defun wiki-turn-getvar (var)
-  (cadr (assoc (strcase var t) *wiki-turn-settings*))
+(defun turn-getvar (var)
+  (cadr (assoc (strcase var t) *turn-settings*))
 )
 
 ;;; ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@
 
 ;; role -> (default colour setting key, description)
 (setq
-  *wiki-turn-roles*
+  *turn-roles*
    '(("BODY" "color.body" "vehicle body outline at a step along the path")
      ("FRNT-LEFT" "color.frontpath" "guide axle left tire path")
      ("FRNT-RGHT" "color.frontpath" "guide axle right tire path")
@@ -192,27 +192,27 @@
   ;; Roles that belong to the whole vehicle rather than to one segment. Their
   ;; keys carry no segment stem, so the layer is C-TURN-ENVL, not
   ;; C-TURN-TRCK-ENVL: one rig sweeps one envelope.
-  *wiki-turn-vehicle-roles*
+  *turn-vehicle-roles*
    '(("ENVL" "color.envelope" "swept path envelope of the whole vehicle"))
-  ;; Filled in by wiki-turn-read-layers-dat. nil means "use the defaults".
-  *wiki-turn-layer-overrides* nil
+  ;; Filled in by turn-read-layers-dat. nil means "use the defaults".
+  *turn-layer-overrides* nil
 )
 
-(defun wiki-turn-segment-stem (index)
+(defun turn-segment-stem (index)
   (if (zerop index) "TRCK" (strcat "TRL" (itoa index)))
 )
 
 ;; A nil index means the whole vehicle, and the key is the bare role.
-(defun wiki-turn-layer-key (index role)
+(defun turn-layer-key (index role)
   (if index
-    (strcat (wiki-turn-segment-stem index) "-" role)
+    (strcat (turn-segment-stem index) "-" role)
     role
   )
 )
 
 ;; Read turn-layers.dat if the user has one. Same shape as the flagship's
 ;; Layers.dat: one parenthesised list per line, semicolon comments.
-(defun wiki-turn-read-layers-dat (/ f line lst path)
+(defun turn-read-layers-dat (/ f line lst path)
   (if (setq path (findfile "turn-layers.dat"))
     (progn
       (setq f (open path "r"))
@@ -223,36 +223,36 @@
         )
       )
       (close f)
-      (setq *wiki-turn-layer-overrides* (reverse lst))
+      (setq *turn-layer-overrides* (reverse lst))
     )
   )
-  *wiki-turn-layer-overrides*
+  *turn-layer-overrides*
 )
 
 ;; The role's entry, whether it is a per-segment role or a whole-vehicle one.
-(defun wiki-turn-role (role)
-  (cond ((assoc role *wiki-turn-roles*))
-        ((assoc role *wiki-turn-vehicle-roles*))
+(defun turn-role (role)
+  (cond ((assoc role *turn-roles*))
+        ((assoc role *turn-vehicle-roles*))
   )
 )
 
 ;; (name colour linetype) for one segment and role.
-(defun wiki-turn-layer-def (index role / key override)
+(defun turn-layer-def (index role / key override)
   (setq
-    key (wiki-turn-layer-key index role)
-    override (assoc key *wiki-turn-layer-overrides*)
+    key (turn-layer-key index role)
+    override (assoc key *turn-layer-overrides*)
   )
   (if override
     (cdr override)
     (list
       (strcat "C-TURN-" key)
-      (wiki-turn-getvar (cadr (wiki-turn-role role)))
+      (turn-getvar (cadr (turn-role role)))
       ""
     )
   )
 )
 
-(defun wiki-turn-layer (index role) (car (wiki-turn-layer-def index role)))
+(defun turn-layer (index role) (car (turn-layer-def index role)))
 
 ;; Create a layer if it is absent. Linetype is left at Continuous on purpose:
 ;; naming a linetype that is not loaded desynchronises -LAYER and silently
@@ -263,7 +263,7 @@
 ;; An empty linetype means Continuous. Naming a linetype that is not loaded
 ;; desynchronises -LAYER and silently costs you the layer, which is what cost
 ;; 1.1.9 users their tire paths: its path layers asked for "dashed".
-(defun wiki-turn-make-layer (name color description linetype / clayer)
+(defun turn-make-layer (name color description linetype / clayer)
   (if (not (tblsearch "layer" name))
     (progn
       (setq clayer (getvar "clayer"))
@@ -286,10 +286,10 @@
 ;; Every layer one segment needs. Called at run time, never at load time.
 ;; 1.1.9 made its layers at LOAD time, so loading TURN in one drawing and
 ;; running it in another left entmake silently failing on absent layers.
-(defun wiki-turn-make-segment-layers (index / def role)
-  (foreach role *wiki-turn-roles*
-    (setq def (wiki-turn-layer-def index (car role)))
-    (wiki-turn-make-layer
+(defun turn-make-segment-layers (index / def role)
+  (foreach role *turn-roles*
+    (setq def (turn-layer-def index (car role)))
+    (turn-make-layer
       (car def)
       (cadr def)
       (strcat "TURN.LSP " (caddr role))
@@ -298,10 +298,10 @@
   )
 )
 
-(defun wiki-turn-make-vehicle-layers (/ def role)
-  (foreach role *wiki-turn-vehicle-roles*
-    (setq def (wiki-turn-layer-def nil (car role)))
-    (wiki-turn-make-layer
+(defun turn-make-vehicle-layers (/ def role)
+  (foreach role *turn-vehicle-roles*
+    (setq def (turn-layer-def nil (car role)))
+    (turn-make-layer
       (car def)
       (cadr def)
       (strcat "TURN.LSP " (caddr role))
@@ -316,7 +316,7 @@
 
 ;; AutoLISP has no arcsine. 1.1.x carried (/ x (sqrt (- 1 (* x x)))), which is
 ;; the TANGENT of the arcsine, not the arcsine. The missing atan is restored.
-(defun wiki-turn-asin (x)
+(defun turn-asin (x)
   (cond
     ((>= x 1.0) (/ pi 2))
     ((<= x -1.0) (/ pi -2))
@@ -326,28 +326,28 @@
 
 ;; Fold an angle into -pi..pi so that articulation angles read as "18 degrees
 ;; left", not "342 degrees right".
-(defun wiki-turn-normalize-angle (a)
+(defun turn-normalize-angle (a)
   (while (> a pi) (setq a (- a (* 2 pi))))
   (while (<= a (- pi)) (setq a (+ a (* 2 pi))))
   a
 )
 
-(defun wiki-turn-left (pt heading dist) (polar pt (+ heading (/ pi 2)) dist))
-(defun wiki-turn-right (pt heading dist) (polar pt (- heading (/ pi 2)) dist))
+(defun turn-left (pt heading dist) (polar pt (+ heading (/ pi 2)) dist))
+(defun turn-right (pt heading dist) (polar pt (- heading (/ pi 2)) dist))
 
 ;; TURN never calls (alert) directly. A modal dialog stops an unattended script
 ;; dead, and redefining the built-in alert to get around that clobbers it for
 ;; every other application sharing the session. So TURN owns this one and lets
 ;; the caller decide how a message should behave.
 ;;
-;; Set *wiki-turn-alert-handler* to a function of one string argument to
+;; Set *turn-alert-handler* to a function of one string argument to
 ;; redirect messages - a test harness points it at its log writer. Leave it nil
 ;; and messages go to a dialog, as a user expects.
-(setq *wiki-turn-alert-handler* nil)
-(defun wiki-turn-alert (msg)
+(setq *turn-alert-handler* nil)
+(defun turn-alert (msg)
   (princ (strcat "\n" msg))
-  (if *wiki-turn-alert-handler*
-    (apply *wiki-turn-alert-handler* (list msg))
+  (if *turn-alert-handler*
+    (apply *turn-alert-handler* (list msg))
     (alert msg)
   )
   (princ)
@@ -359,7 +359,7 @@
 ;;; PURE. No prompts, no entmake, no getvar. Everything here can be called
 ;;; directly from a test file. Do not add drawing code to this section.
 
-(defun wiki-turn-state (guide trail heading steer turned)
+(defun turn-state (guide trail heading steer turned)
   (list
     (cons "guide" guide)
     (cons "trail" trail)
@@ -369,15 +369,15 @@
   )
 )
 
-(defun wiki-turn-guide (state) (cdr (assoc "guide" state)))
-(defun wiki-turn-trail (state) (cdr (assoc "trail" state)))
-(defun wiki-turn-heading (state) (cdr (assoc "heading" state)))
-(defun wiki-turn-steer (state) (cdr (assoc "steer" state)))
-(defun wiki-turn-turned (state) (cdr (assoc "turned" state)))
+(defun turn-guide (state) (cdr (assoc "guide" state)))
+(defun turn-trail (state) (cdr (assoc "trail" state)))
+(defun turn-heading (state) (cdr (assoc "heading" state)))
+(defun turn-steer (state) (cdr (assoc "steer" state)))
+(defun turn-turned (state) (cdr (assoc "turned" state)))
 
 ;; How far the segment's heading changes as its guide point moves from its
 ;; current position to guide-1. This is the 2002 equation, unchanged.
-(defun wiki-turn-angle-turned (guide-0 heading-0 wheelbase guide-1 / deviation
+(defun turn-angle-turned (guide-0 heading-0 wheelbase guide-1 / deviation
                                deviation-supplement direction travelled
                               )
   (setq travelled (distance guide-0 guide-1))
@@ -404,29 +404,29 @@
 )
 
 ;; Advance one segment by one step.
-(defun wiki-turn-step (state wheelbase guide-1 / heading-1 radius steer travelled turned)
+(defun turn-step (state wheelbase guide-1 / heading-1 radius steer travelled turned)
   (setq
-    turned (wiki-turn-angle-turned (wiki-turn-guide state) (wiki-turn-heading state) wheelbase guide-1)
-    heading-1 (+ (wiki-turn-heading state) turned)
-    travelled (distance (wiki-turn-guide state) guide-1)
+    turned (turn-angle-turned (turn-guide state) (turn-heading state) wheelbase guide-1)
+    heading-1 (+ (turn-heading state) turned)
+    travelled (distance (turn-guide state) guide-1)
     ;; Radius the guide axle is describing this step, and the steer angle that
     ;; radius demands. sin(steer) = wheelbase / radius for a bicycle model.
     radius (if (zerop turned) nil (/ travelled 2 (sin (/ turned 2))))
-    steer (if radius (wiki-turn-asin (/ wheelbase radius)) 0.0)
+    steer (if radius (turn-asin (/ wheelbase radius)) 0.0)
   )
-  (wiki-turn-state guide-1 (polar guide-1 heading-1 (- wheelbase)) heading-1 steer turned)
+  (turn-state guide-1 (polar guide-1 heading-1 (- wheelbase)) heading-1 steer turned)
 )
 
 ;; Track one segment along a whole course. Returns a list of states, one per
 ;; course point.
-(defun wiki-turn-segment-path (wheelbase course heading-0 / guide-1 state states)
+(defun turn-segment-path (wheelbase course heading-0 / guide-1 state states)
   (setq
-    state (wiki-turn-state (car course) (polar (car course) heading-0 (- wheelbase)) heading-0 0.0 0.0)
+    state (turn-state (car course) (polar (car course) heading-0 (- wheelbase)) heading-0 0.0 0.0)
     states (list state)
   )
   (foreach guide-1 (cdr course)
     (setq
-      state (wiki-turn-step state wheelbase guide-1)
+      state (turn-step state wheelbase guide-1)
       states (cons state states)
     )
   )
@@ -435,29 +435,29 @@
 
 ;; Where this segment's hitch is in one state: a fixed distance behind its
 ;; trailing axle. This is the next segment's guide point.
-(defun wiki-turn-hitch-point (hitch state)
-  (polar (wiki-turn-trail state) (wiki-turn-heading state) (- hitch))
+(defun turn-hitch-point (hitch state)
+  (polar (turn-trail state) (turn-heading state) (- hitch))
 )
 
 ;; The course the NEXT segment's guide point follows: the locus of this
 ;; segment's hitch across every state.
-(defun wiki-turn-hitch-course (hitch states)
-  (mapcar '(lambda (state) (wiki-turn-hitch-point hitch state)) states)
+(defun turn-hitch-course (hitch states)
+  (mapcar '(lambda (state) (turn-hitch-point hitch state)) states)
 )
 
 ;; THE CHAIN. Track a whole vehicle along a course.
 ;; Returns a list of state-lists, one per segment, in vehicle order.
 ;;
 ;; The rig is assumed to start straight, so every segment starts on heading-0.
-(defun wiki-turn-path (vehicle course heading-0 / hitch paths segment states)
+(defun turn-path (vehicle course heading-0 / hitch paths segment states)
   (foreach segment vehicle
     (setq
-      states (wiki-turn-segment-path (wiki-turn-seg-get segment "wheelbase") course heading-0)
+      states (turn-segment-path (turn-seg-get segment "wheelbase") course heading-0)
       paths (cons states paths)
-      hitch (wiki-turn-seg-get segment "hitch")
+      hitch (turn-seg-get segment "hitch")
     )
     (if hitch
-      (setq course (wiki-turn-hitch-course hitch states))
+      (setq course (turn-hitch-course hitch states))
     )
   )
   (reverse paths)
@@ -474,13 +474,13 @@
 ;;; travel distance determine.
 ;;;
 ;;; In a bicycle model the steered wheel rolls in the direction it points, so
-;;; the guide axle centre travels along (heading + steer). wiki-turn-step then
+;;; the guide axle centre travels along (heading + steer). turn-step then
 ;;; recovers the heading change and the steer that geometry implies, exactly as
 ;;; it does when following a drawn course. Driving with steer d and reading the
 ;;; resulting state's steer back must give d again; the test suite asserts it.
 ;;;
 ;;; NOTHING HERE CLAMPS TO THE STEERING LOCK. The kernel reports what the
-;;; geometry does; wiki-turn-findings is what judges it against the vehicle's
+;;; geometry does; turn-findings is what judges it against the vehicle's
 ;;; limits, and the command shell is what refuses to steer further. Keeping the
 ;;; judgement in one place is why the limits could be switched on at all.
 ;;; ---------------------------------------------------------------------------
@@ -490,32 +490,32 @@
 ;; THE ARGUMENT IS CALLED "travel", NOT "distance", AND MUST STAY THAT WAY.
 ;; AutoLISP scopes arguments dynamically, so a parameter named `distance` would
 ;; shadow the `distance` subr for the whole call - including inside
-;; wiki-turn-step, which calls it. The first version of this function did
+;; turn-step, which calls it. The first version of this function did
 ;; exactly that and died with "bad function: 5.0", 5.0 being the travel
 ;; distance evaluated in function position. Same trap as `last`, but worse: the
 ;; shadowing reaches into functions this one calls, so the breakage surfaces far
 ;; from the name that caused it.
-(defun wiki-turn-drive-step (state wheelbase steer travel)
-  (wiki-turn-step
+(defun turn-drive-step (state wheelbase steer travel)
+  (turn-step
     state
     wheelbase
-    (polar (wiki-turn-guide state) (+ (wiki-turn-heading state) steer) travel)
+    (polar (turn-guide state) (+ (turn-heading state) steer) travel)
   )
 )
 
 ;; The whole rig, standing straight and still with its powered guide axle at
 ;; GUIDE. Each segment is hitched to the one ahead. This is where driving starts.
-(defun wiki-turn-rest-states (vehicle guide heading-0 / hitch out state)
+(defun turn-rest-states (vehicle guide heading-0 / hitch out state)
   (foreach segment vehicle
     (setq
-      state (wiki-turn-state
+      state (turn-state
               guide
-              (polar guide heading-0 (- (wiki-turn-seg-get segment "wheelbase")))
+              (polar guide heading-0 (- (turn-seg-get segment "wheelbase")))
               heading-0 0.0 0.0)
       out (cons state out)
-      hitch (wiki-turn-seg-get segment "hitch")
+      hitch (turn-seg-get segment "hitch")
     )
-    (if hitch (setq guide (wiki-turn-hitch-point hitch state)))
+    (if hitch (setq guide (turn-hitch-point hitch state)))
   )
   (reverse out)
 )
@@ -523,8 +523,8 @@
 ;; Drive the whole rig one step. Takes one state per segment and returns one
 ;; state per segment. Only the powered unit is steered; every segment behind it
 ;; is dragged to wherever the hitch ahead of it has moved, which is the same
-;; chain wiki-turn-path walks, one step at a time instead of all at once.
-(defun wiki-turn-drive (vehicle states steer travel / guide-1 hitch out segment state)
+;; chain turn-path walks, one step at a time instead of all at once.
+(defun turn-drive (vehicle states steer travel / guide-1 hitch out segment state)
   (setq out nil guide-1 nil)
   (while vehicle
     (setq
@@ -532,12 +532,12 @@
       state (car states)
       state
        (if guide-1
-         (wiki-turn-step state (wiki-turn-seg-get segment "wheelbase") guide-1)
-         (wiki-turn-drive-step state (wiki-turn-seg-get segment "wheelbase") steer travel)
+         (turn-step state (turn-seg-get segment "wheelbase") guide-1)
+         (turn-drive-step state (turn-seg-get segment "wheelbase") steer travel)
        )
       out (cons state out)
-      hitch (wiki-turn-seg-get segment "hitch")
-      guide-1 (if hitch (wiki-turn-hitch-point hitch state))
+      hitch (turn-seg-get segment "hitch")
+      guide-1 (if hitch (turn-hitch-point hitch state))
       vehicle (cdr vehicle)
       states (cdr states)
     )
@@ -545,20 +545,42 @@
   (reverse out)
 )
 
+;; The steer angle that aims the guide axle at a target point, limited to what
+;; the vehicle's steering can actually do.
+;;
+;; THIS is where the steering lock clamps, because here it is the truth: a
+;; driver hauling the wheel further than the stops does not turn tighter. The
+;; kernel's stepping functions deliberately do not clamp - they report what the
+;; geometry does and let turn-findings judge it - but a driver aiming at a
+;; point is asking for an intention, not stating a fact, and an intention the
+;; vehicle cannot carry out is simply not available.
+(defun turn-steer-toward (state target lock / wanted)
+  (setq wanted
+    (turn-normalize-angle
+      (- (angle (turn-guide state) target) (turn-heading state))))
+  (cond
+    ((null lock) wanted)
+    ((< lock 1e-9) wanted)          ; no lock recorded: do not invent one
+    ((> wanted lock) lock)
+    ((< wanted (- lock)) (- lock))
+    (t wanted)
+  )
+)
+
 ;; Drive a sequence of inputs, each a (steer . distance) pair.
 ;;
-;; RETURNS THE SAME SHAPE AS wiki-turn-path -- one list of states per segment,
+;; RETURNS THE SAME SHAPE AS turn-path -- one list of states per segment,
 ;; in vehicle order - so everything that draws, measures or judges a path works
 ;; on a driven one with no change at all. That equivalence is the point of
 ;; building drive mode on this kernel rather than beside it.
-(defun wiki-turn-drive-path (vehicle inputs guide heading-0 / history states)
+(defun turn-drive-path (vehicle inputs guide heading-0 / history states)
   (setq
-    states (wiki-turn-rest-states vehicle guide heading-0)
+    states (turn-rest-states vehicle guide heading-0)
     history (list states)
   )
   (foreach input inputs
     (setq
-      states (wiki-turn-drive vehicle states (car input) (cdr input))
+      states (turn-drive vehicle states (car input) (cdr input))
       history (cons states history)
     )
   )
@@ -568,9 +590,9 @@
 )
 
 ;; Articulation angle between two coupled segments at every step.
-(defun wiki-turn-articulation (states-lead states-follow)
+(defun turn-articulation (states-lead states-follow)
   (mapcar
-    '(lambda (a b) (wiki-turn-normalize-angle (- (wiki-turn-heading a) (wiki-turn-heading b))))
+    '(lambda (a b) (turn-normalize-angle (- (turn-heading a) (turn-heading b))))
     states-lead
     states-follow
   )
@@ -578,39 +600,39 @@
 
 ;; The four body corners of one segment in one state, front-left first, going
 ;; clockwise as seen from above: FL, FR, RR, RL.
-(defun wiki-turn-body-corners (segment state / front-mid half heading rear-mid)
+(defun turn-body-corners (segment state / front-mid half heading rear-mid)
   (setq
-    heading (wiki-turn-heading state)
-    half (/ (wiki-turn-seg-get segment "body-width") 2.0)
-    front-mid (polar (wiki-turn-guide state) heading (wiki-turn-seg-get segment "front-hang"))
-    rear-mid (polar front-mid heading (- (wiki-turn-seg-get segment "body-length")))
+    heading (turn-heading state)
+    half (/ (turn-seg-get segment "body-width") 2.0)
+    front-mid (polar (turn-guide state) heading (turn-seg-get segment "front-hang"))
+    rear-mid (polar front-mid heading (- (turn-seg-get segment "body-length")))
   )
   (list
-    (wiki-turn-left front-mid heading half)
-    (wiki-turn-right front-mid heading half)
-    (wiki-turn-right rear-mid heading half)
-    (wiki-turn-left rear-mid heading half)
+    (turn-left front-mid heading half)
+    (turn-right front-mid heading half)
+    (turn-right rear-mid heading half)
+    (turn-left rear-mid heading half)
   )
 )
 
 ;; The locus of one body corner across every step. Corner 0=FL 1=FR 2=RR 3=RL.
 ;; These are the "lines for the left and right side of the vehicle" that no
 ;; version of TURN has ever drawn.
-(defun wiki-turn-corner-locus (segment states corner)
+(defun turn-corner-locus (segment states corner)
   (mapcar
-    '(lambda (state) (nth corner (wiki-turn-body-corners segment state)))
+    '(lambda (state) (nth corner (turn-body-corners segment state)))
     states
   )
 )
 
 ;; Tire loci for one segment: front-left, front-right, rear-left, rear-right.
-(defun wiki-turn-tire-loci (segment states / half)
-  (setq half (/ (wiki-turn-seg-get segment "axle-width") 2.0))
+(defun turn-tire-loci (segment states / half)
+  (setq half (/ (turn-seg-get segment "axle-width") 2.0))
   (list
-    (mapcar '(lambda (s) (wiki-turn-left (wiki-turn-guide s) (wiki-turn-heading s) half)) states)
-    (mapcar '(lambda (s) (wiki-turn-right (wiki-turn-guide s) (wiki-turn-heading s) half)) states)
-    (mapcar '(lambda (s) (wiki-turn-left (wiki-turn-trail s) (wiki-turn-heading s) half)) states)
-    (mapcar '(lambda (s) (wiki-turn-right (wiki-turn-trail s) (wiki-turn-heading s) half)) states)
+    (mapcar '(lambda (s) (turn-left (turn-guide s) (turn-heading s) half)) states)
+    (mapcar '(lambda (s) (turn-right (turn-guide s) (turn-heading s) half)) states)
+    (mapcar '(lambda (s) (turn-left (turn-trail s) (turn-heading s) half)) states)
+    (mapcar '(lambda (s) (turn-right (turn-trail s) (turn-heading s) half)) states)
   )
 )
 
@@ -619,9 +641,9 @@
 ;;; ===========================================================================
 ;;; PURE. A vehicle is a list of segments. A segment is an alist.
 
-(defun wiki-turn-seg-get (segment key) (cdr (assoc key segment)))
+(defun turn-seg-get (segment key) (cdr (assoc key segment)))
 
-(defun wiki-turn-segment (name wheelbase axle-width body-length body-width front-hang hitch steer-lock art-angle)
+(defun turn-segment (name wheelbase axle-width body-length body-width front-hang hitch steer-lock art-angle)
   (list
     (cons "name" name)
     (cons "wheelbase" wheelbase)
@@ -638,25 +660,25 @@
 ;; Analysis. Given a vehicle and its path, what went wrong and where?
 ;; Returns a list of finding strings. An empty list means the manoeuvre is
 ;; achievable by this vehicle.
-(defun wiki-turn-findings (vehicle paths / art art-limit i index findings lead
+(defun turn-findings (vehicle paths / art art-limit i index findings lead
                            max-art max-steer segment states steer-limit
                           )
   (setq index 0)
   (foreach segment vehicle
     (setq states (nth index paths))
     ;; Steer lock, powered unit only.
-    (if (and (zerop index) (setq steer-limit (wiki-turn-seg-get segment "steer-lock")) (< 0 steer-limit))
+    (if (and (zerop index) (setq steer-limit (turn-seg-get segment "steer-lock")) (< 0 steer-limit))
       (progn
         (setq max-steer 0.0)
         (foreach s states
-          (if (> (abs (wiki-turn-steer s)) max-steer) (setq max-steer (abs (wiki-turn-steer s))))
+          (if (> (abs (turn-steer s)) max-steer) (setq max-steer (abs (turn-steer s))))
         )
         (if (> max-steer steer-limit)
           (setq
             findings
              (cons
                (strcat
-                 "Steering lock exceeded on " (wiki-turn-seg-get segment "name")
+                 "Steering lock exceeded on " (turn-seg-get segment "name")
                  ": course demands " (angtos max-steer 0 1)
                  ", vehicle has " (angtos steer-limit 0 1) "."
                )
@@ -667,11 +689,11 @@
       )
     )
     ;; Articulation at this segment's hitch.
-    (if (and (wiki-turn-seg-get segment "hitch") (nth (1+ index) paths))
+    (if (and (turn-seg-get segment "hitch") (nth (1+ index) paths))
       (progn
         (setq
-          art (wiki-turn-articulation states (nth (1+ index) paths))
-          art-limit (wiki-turn-seg-get segment "art-angle")
+          art (turn-articulation states (nth (1+ index) paths))
+          art-limit (turn-seg-get segment "art-angle")
           max-art 0.0
         )
         (foreach a art (if (> (abs a) max-art) (setq max-art (abs a))))
@@ -680,7 +702,7 @@
             findings
              (cons
                (strcat
-                 "Jackknife: articulation behind " (wiki-turn-seg-get segment "name")
+                 "Jackknife: articulation behind " (turn-seg-get segment "name")
                  " reaches " (angtos max-art 0 1)
                  ", limit is " (angtos art-limit 0 1) "."
                )
@@ -704,7 +726,7 @@
 
 ;; Attribute tag for one segment property.
 ;; index 0 = powered unit, 1 = first trailer (legacy tags), 2+ = new tags.
-(defun wiki-turn-tag (index key / prefix)
+(defun turn-tag (index key / prefix)
   (cond
     ((zerop index)
      (cdr
@@ -736,12 +758,12 @@
 )
 
 ;; Tag that says whether segment `index` tows anything.
-(defun wiki-turn-have-tag (index)
+(defun turn-have-tag (index)
   (if (zerop index) "TRAILHAVE" (strcat "TRAILER" (itoa (1+ index)) "HAVE"))
 )
 
 ;; All attributes of a block insert, as ("TAG" . "value").
-(defun wiki-turn-block-attributes (en / el et out)
+(defun turn-block-attributes (en / el et out)
   (while (and
            (setq en (entnext en))
            (setq el (entget en))
@@ -755,14 +777,14 @@
   (reverse out)
 )
 
-(defun wiki-turn-att-real (atts tag default / v)
+(defun turn-att-real (atts tag default / v)
   (if (and tag (setq v (cdr (assoc tag atts))) (setq v (distof v)))
     v
     default
   )
 )
 
-(defun wiki-turn-att-angle (atts tag default / v)
+(defun turn-att-angle (atts tag default / v)
   (if (and tag (setq v (cdr (assoc tag atts))))
     (cond ((distof v) (* pi (/ (distof v) 180.0))) (t default))
     default
@@ -774,40 +796,40 @@
 ;; guide axle to the bumper. On a trailer TRAILERFRONTHANG runs BACKWARD from
 ;; the hitch eye ("forward is NEGATIVE" in the old prompt). The model keeps a
 ;; single convention - forward positive - so trailer values are negated here.
-(defun wiki-turn-segment-from-attributes (atts index / front-hang hitch)
+(defun turn-segment-from-attributes (atts index / front-hang hitch)
   (setq
-    front-hang (wiki-turn-att-real atts (wiki-turn-tag index "front-hang") 0.0)
+    front-hang (turn-att-real atts (turn-tag index "front-hang") 0.0)
     front-hang (if (zerop index) front-hang (- front-hang))
     hitch
-     (if (= "YES" (strcase (cond ((cdr (assoc (wiki-turn-have-tag index) atts))) ("No"))))
-       (wiki-turn-att-real atts (wiki-turn-tag index "hitch") 0.0)
+     (if (= "YES" (strcase (cond ((cdr (assoc (turn-have-tag index) atts))) ("No"))))
+       (turn-att-real atts (turn-tag index "hitch") 0.0)
        nil
      )
   )
-  (wiki-turn-segment
-    (cond ((cdr (assoc (wiki-turn-tag index "name") atts))) ((strcat "Segment" (itoa index))))
-    (wiki-turn-att-real atts (wiki-turn-tag index "wheelbase") 0.0)
-    (wiki-turn-att-real atts (wiki-turn-tag index "axle-width") 0.0)
-    (wiki-turn-att-real atts (wiki-turn-tag index "body-length") 0.0)
-    (wiki-turn-att-real atts (wiki-turn-tag index "body-width") 0.0)
+  (turn-segment
+    (cond ((cdr (assoc (turn-tag index "name") atts))) ((strcat "Segment" (itoa index))))
+    (turn-att-real atts (turn-tag index "wheelbase") 0.0)
+    (turn-att-real atts (turn-tag index "axle-width") 0.0)
+    (turn-att-real atts (turn-tag index "body-length") 0.0)
+    (turn-att-real atts (turn-tag index "body-width") 0.0)
     front-hang
     hitch
-    (wiki-turn-att-angle atts (wiki-turn-tag index "steer-lock") 0.0)
-    (wiki-turn-att-angle atts (wiki-turn-tag index "art-angle") 0.0)
+    (turn-att-angle atts (turn-tag index "steer-lock") 0.0)
+    (turn-att-angle atts (turn-tag index "art-angle") 0.0)
   )
 )
 
 ;; The whole vehicle. Walks the chain until a segment tows nothing.
-(defun wiki-turn-vehicle-from-attributes (atts / index segment vehicle)
+(defun turn-vehicle-from-attributes (atts / index segment vehicle)
   (setq index 0)
   (while
     (progn
       (setq
-        segment (wiki-turn-segment-from-attributes atts index)
+        segment (turn-segment-from-attributes atts index)
         vehicle (cons segment vehicle)
         index (1+ index)
       )
-      (and (wiki-turn-seg-get segment "hitch") (< index 12))
+      (and (turn-seg-get segment "hitch") (< index 12))
     )
   )
   (reverse vehicle)
@@ -834,7 +856,7 @@
 ;;; splines and Civil 3D alignments alike, needs no screen picking accuracy,
 ;;; and leaves nothing behind.
 
-(defun wiki-turn-curve-p (en)
+(defun turn-curve-p (en)
   (and en (vl-catch-all-apply 'vlax-curve-getEndParam (list en))
        (not (vl-catch-all-error-p (vl-catch-all-apply 'vlax-curve-getEndParam (list en))))
   )
@@ -842,7 +864,7 @@
 
 ;; Sample a curve into a course of points, `step` apart, travelling away from
 ;; whichever end the user picked nearest.
-(defun wiki-turn-course-from-curve (en pick step / dist far len out reverse-p)
+(defun turn-course-from-curve (en pick step / dist far len out reverse-p)
   (setq
     len (vlax-curve-getDistAtParam en (vlax-curve-getEndParam en))
     reverse-p
@@ -890,14 +912,14 @@
 ;;; behind the hitch eye.
 
 (setq
-  *wiki-turn-library* nil
+  *turn-library* nil
   ;; Set this to read a specific file instead of searching the support
   ;; path. Tests use it; leave it nil in normal use.
-  *wiki-turn-vehicles-file* nil
+  *turn-vehicles-file* nil
 )
 
-(defun wiki-turn-library-record-to-segment (rec)
-  (wiki-turn-segment
+(defun turn-library-record-to-segment (rec)
+  (turn-segment
     (nth 1 rec)
     (float (nth 2 rec))
     (float (nth 3 rec))
@@ -910,9 +932,9 @@
   )
 )
 
-;; Read turn-vehicles.dat into *wiki-turn-library*, a list of
+;; Read turn-vehicles.dat into *turn-library*, a list of
 ;; ("KEY" "Description" "UNITS" vehicle).
-(defun wiki-turn-read-vehicles-dat (/ desc f key line lst path rec segs units)
+(defun turn-read-vehicles-dat (/ desc f key line lst path rec segs units)
   ;; findfile on an absolute path returns it only if it exists, so a bad
   ;; explicit path falls through to nil instead of handing (open) a name that
   ;; is not there.
@@ -924,8 +946,8 @@
   ;; different library when the named one is absent would silently give you
   ;; somebody else vehicles.
   (if (setq path
-        (if *wiki-turn-vehicles-file*
-          (findfile *wiki-turn-vehicles-file*)
+        (if *turn-vehicles-file*
+          (findfile *turn-vehicles-file*)
           (findfile "turn-vehicles.dat")
         )
       )
@@ -948,7 +970,7 @@
                )
               )
               ((and (= "SEGMENT" (strcase (car rec))) key)
-               (setq segs (cons (wiki-turn-library-record-to-segment rec) segs))
+               (setq segs (cons (turn-library-record-to-segment rec) segs))
               )
             )
           )
@@ -956,55 +978,55 @@
       )
       (close f)
       (if key (setq lst (cons (list key desc units (reverse segs)) lst)))
-      (setq *wiki-turn-library* (reverse lst))
+      (setq *turn-library* (reverse lst))
     )
   )
-  *wiki-turn-library*
+  *turn-library*
 )
 
-(defun wiki-turn-library-keys ()
-  (mapcar 'car (wiki-turn-read-vehicles-dat))
+(defun turn-library-keys ()
+  (mapcar 'car (turn-read-vehicles-dat))
 )
 
-(defun wiki-turn-library-entry (key / hit)
-  (foreach e (wiki-turn-read-vehicles-dat)
+(defun turn-library-entry (key / hit)
+  (foreach e (turn-read-vehicles-dat)
     (if (= (strcase key) (strcase (car e))) (setq hit e))
   )
   hit
 )
 
-(defun wiki-turn-library-vehicle (key / e)
-  (if (setq e (wiki-turn-library-entry key)) (cadddr e))
+(defun turn-library-vehicle (key / e)
+  (if (setq e (turn-library-entry key)) (cadddr e))
 )
 
-(defun wiki-turn-library-description (key / e)
-  (if (setq e (wiki-turn-library-entry key)) (cadr e))
+(defun turn-library-description (key / e)
+  (if (setq e (turn-library-entry key)) (cadr e))
 )
 
-(defun wiki-turn-library-units (key / e)
-  (if (setq e (wiki-turn-library-entry key)) (caddr e))
+(defun turn-library-units (key / e)
+  (if (setq e (turn-library-entry key)) (caddr e))
 )
 
 ;; Scale a vehicle by a constant. Library vehicles are stored in the units the
 ;; standard publishes them in; a drawing in other units needs them converted.
-(defun wiki-turn-scale-segment (segment factor)
-  (wiki-turn-segment
-    (wiki-turn-seg-get segment "name")
-    (* factor (wiki-turn-seg-get segment "wheelbase"))
-    (* factor (wiki-turn-seg-get segment "axle-width"))
-    (* factor (wiki-turn-seg-get segment "body-length"))
-    (* factor (wiki-turn-seg-get segment "body-width"))
-    (* factor (wiki-turn-seg-get segment "front-hang"))
-    (if (wiki-turn-seg-get segment "hitch")
-      (* factor (wiki-turn-seg-get segment "hitch"))
+(defun turn-scale-segment (segment factor)
+  (turn-segment
+    (turn-seg-get segment "name")
+    (* factor (turn-seg-get segment "wheelbase"))
+    (* factor (turn-seg-get segment "axle-width"))
+    (* factor (turn-seg-get segment "body-length"))
+    (* factor (turn-seg-get segment "body-width"))
+    (* factor (turn-seg-get segment "front-hang"))
+    (if (turn-seg-get segment "hitch")
+      (* factor (turn-seg-get segment "hitch"))
     )
-    (wiki-turn-seg-get segment "steer-lock")
-    (wiki-turn-seg-get segment "art-angle")
+    (turn-seg-get segment "steer-lock")
+    (turn-seg-get segment "art-angle")
   )
 )
 
-(defun wiki-turn-scale-vehicle (vehicle factor)
-  (mapcar '(lambda (s) (wiki-turn-scale-segment s factor)) vehicle)
+(defun turn-scale-vehicle (vehicle factor)
+  (mapcar '(lambda (s) (turn-scale-segment s factor)) vehicle)
 )
 
 ;; Length of one drawing unit, expressed in metres, from INSUNITS.
@@ -1013,9 +1035,9 @@
 ;; It is not TURN's place to second-guess an AutoCAD setting: AutoCAD has
 ;; settings for this and we honour them. What TURN does owe the user is to say
 ;; out loud what it read and what it is therefore doing - see
-;; wiki-turn-report-units - so a drawing that is set up wrong shows itself as a
+;; turn-report-units - so a drawing that is set up wrong shows itself as a
 ;; number at the command line rather than as a vehicle the wrong size.
-(defun wiki-turn-drawing-unit-metres (/ code)
+(defun turn-drawing-unit-metres (/ code)
   (setq code (getvar "insunits"))
   (cdr
     (assoc
@@ -1029,7 +1051,7 @@
   )
 )
 
-(defun wiki-turn-units-metres (units / u)
+(defun turn-units-metres (units / u)
   (setq u (strcase units))
   (cond
     ((member u '("FT" "FEET" "F" "I" "IMPERIAL")) 0.3048)
@@ -1042,14 +1064,14 @@
 
 ;; The factor that turns library units into drawing units. 1.0, plus a warning,
 ;; when the drawing has not declared its units.
-(defun wiki-turn-library-scale (units / drawing library)
+(defun turn-library-scale (units / drawing library)
   (setq
-    library (wiki-turn-units-metres units)
-    drawing (wiki-turn-drawing-unit-metres)
+    library (turn-units-metres units)
+    drawing (turn-drawing-unit-metres)
   )
   (cond
     ((not library)
-     (wiki-turn-alert
+     (turn-alert
        (strcat "The library says this vehicle is in \"" units "\", which TURN does not"
                "\nrecognise. Using its dimensions unscaled.")
      )
@@ -1067,11 +1089,11 @@
 )
 
 ;; A library vehicle, scaled into this drawing's units.
-(defun wiki-turn-library-vehicle-scaled (key / units vehicle)
-  (if (setq vehicle (wiki-turn-library-vehicle key))
+(defun turn-library-vehicle-scaled (key / units vehicle)
+  (if (setq vehicle (turn-library-vehicle key))
     (progn
-      (setq units (wiki-turn-library-units key))
-      (wiki-turn-scale-vehicle vehicle (wiki-turn-library-scale units))
+      (setq units (turn-library-units key))
+      (turn-scale-vehicle vehicle (turn-library-scale units))
     )
   )
 )
@@ -1080,7 +1102,7 @@
 ;;; SECTION 6  DRAWING THE RESULTS
 ;;; ===========================================================================
 
-(defun wiki-turn-draw-pline (points layer closed / lst)
+(defun turn-draw-pline (points layer closed / lst)
   (setq
     lst
      (list
@@ -1098,29 +1120,29 @@
 )
 
 ;; Everything one segment contributes to the drawing.
-(defun wiki-turn-draw-segment (segment states index plot-frequency / corner i loci)
-  (setq loci (wiki-turn-tire-loci segment states))
-  (wiki-turn-draw-pline (nth 0 loci) (wiki-turn-layer index "FRNT-LEFT") nil)
-  (wiki-turn-draw-pline (nth 1 loci) (wiki-turn-layer index "FRNT-RGHT") nil)
-  (wiki-turn-draw-pline (nth 2 loci) (wiki-turn-layer index "REAR-LEFT") nil)
-  (wiki-turn-draw-pline (nth 3 loci) (wiki-turn-layer index "REAR-RGHT") nil)
-  (if (wiki-turn-seg-get segment "hitch")
-    (wiki-turn-draw-pline
-      (wiki-turn-hitch-course (wiki-turn-seg-get segment "hitch") states)
-      (wiki-turn-layer index "HTCH")
+(defun turn-draw-segment (segment states index plot-frequency / corner i loci)
+  (setq loci (turn-tire-loci segment states))
+  (turn-draw-pline (nth 0 loci) (turn-layer index "FRNT-LEFT") nil)
+  (turn-draw-pline (nth 1 loci) (turn-layer index "FRNT-RGHT") nil)
+  (turn-draw-pline (nth 2 loci) (turn-layer index "REAR-LEFT") nil)
+  (turn-draw-pline (nth 3 loci) (turn-layer index "REAR-RGHT") nil)
+  (if (turn-seg-get segment "hitch")
+    (turn-draw-pline
+      (turn-hitch-course (turn-seg-get segment "hitch") states)
+      (turn-layer index "HTCH")
       nil
     )
   )
   ;; The locus of each body corner. These are the four curves that generate
   ;; the envelope; drawn on their own so you can see which corner governs.
-  (if (= "Yes" (wiki-turn-getvar "general.drawcorners"))
+  (if (= "Yes" (turn-getvar "general.drawcorners"))
     (progn
       (setq corner -1)
       (repeat 4
         (setq corner (1+ corner))
-        (wiki-turn-draw-pline
-          (wiki-turn-corner-locus segment states corner)
-          (wiki-turn-layer index "CRNR")
+        (turn-draw-pline
+          (turn-corner-locus segment states corner)
+          (turn-layer index "CRNR")
           nil
         )
       )
@@ -1131,20 +1153,20 @@
   (foreach state states
     (setq i (1+ i))
     (if (zerop (rem i plot-frequency))
-      (wiki-turn-draw-pline
-        (wiki-turn-body-corners segment state)
-        (wiki-turn-layer index "BODY")
+      (turn-draw-pline
+        (turn-body-corners segment state)
+        (turn-layer index "BODY")
         T
       )
     )
   )
 )
 
-(defun wiki-turn-draw-path (vehicle paths plot-frequency / index segment)
+(defun turn-draw-path (vehicle paths plot-frequency / index segment)
   (setq index 0)
   (foreach segment vehicle
-    (wiki-turn-make-segment-layers index)
-    (wiki-turn-draw-segment segment (nth index paths) index plot-frequency)
+    (turn-make-segment-layers index)
+    (turn-draw-segment segment (nth index paths) index plot-frequency)
     (setq index (1+ index))
   )
 )
@@ -1172,7 +1194,7 @@
 ;; Every entity created after MARKER, in database order. A marker of nil means
 ;; "everything". Used to find what a command produced without trusting entlast
 ;; to still point at it.
-(defun wiki-turn-entities-after (marker / en out)
+(defun turn-entities-after (marker / en out)
   (setq en (if marker (entnext marker) (entnext)))
   (while en
     (setq out (cons en out)
@@ -1182,7 +1204,7 @@
   (reverse out)
 )
 
-(defun wiki-turn-selection (enames / ss)
+(defun turn-selection (enames / ss)
   (setq ss (ssadd))
   (foreach en enames (ssadd en ss))
   ss
@@ -1192,9 +1214,9 @@
 ;; The shortest body in the rig. The envelope lays each body outline down once
 ;; per calculation step, so this is the distance a step must stay under if
 ;; consecutive placements are to overlap at all.
-(defun wiki-turn-shortest-body (vehicle / len best)
+(defun turn-shortest-body (vehicle / len best)
   (foreach segment vehicle
-    (setq len (wiki-turn-seg-get segment "body-length"))
+    (setq len (turn-seg-get segment "body-length"))
     (if (or (null best) (< len best)) (setq best len))
   )
   best
@@ -1202,10 +1224,10 @@
 
 ;; The smallest body area, used as the scale against which a loop counts as
 ;; real geometry rather than union litter.
-(defun wiki-turn-smallest-body-area (vehicle / a best)
+(defun turn-smallest-body-area (vehicle / a best)
   (foreach segment vehicle
-    (setq a (* (wiki-turn-seg-get segment "body-length")
-               (wiki-turn-seg-get segment "body-width")))
+    (setq a (* (turn-seg-get segment "body-length")
+               (turn-seg-get segment "body-width")))
     (if (or (null best) (< a best)) (setq best a))
   )
   best
@@ -1217,7 +1239,7 @@
 ;; it is sitting on the layer. Anything above the tolerance is left alone: a
 ;; genuine hole is the drawing telling the truth about a coarse step, and
 ;; deleting it would hide that.
-(defun wiki-turn-drop-slivers (entities tolerance / a dropped)
+(defun turn-drop-slivers (entities tolerance / a dropped)
   (setq dropped 0)
   (foreach en entities
     (command "._area" "_object" en)
@@ -1242,7 +1264,7 @@
 ;;
 ;; A loop whose ends are genuinely apart is left alone and counted. That is
 ;; missing geometry rather than a missing flag, and the two want opposite fixes.
-(defun wiki-turn-close-loops (entities layer tolerance / closed el gap opened pts)
+(defun turn-close-loops (entities layer tolerance / closed el gap opened pts)
   (setq closed 0 opened 0)
   (foreach en entities
     (setq
@@ -1253,7 +1275,7 @@
       ((< (length pts) 3) nil)
       ((= 1 (logand 1 (cdr (assoc 70 el)))) nil)   ; already closed
       ((< (setq gap (distance (car pts) (last pts))) tolerance)
-       (wiki-turn-draw-pline (reverse (cdr (reverse pts))) layer T)
+       (turn-draw-pline (reverse (cdr (reverse pts))) layer T)
        (entdel en)
        (setq closed (1+ closed))
       )
@@ -1263,13 +1285,13 @@
   (list closed opened)
 )
 
-(defun wiki-turn-draw-envelope (vehicle paths / area clayer index layer loops
+(defun turn-draw-envelope (vehicle paths / area clayer index layer loops
                                 marker peditaccept regions segment ss state
                                 kept slivers shut
                                )
-  (wiki-turn-make-vehicle-layers)
+  (turn-make-vehicle-layers)
   (setq
-    layer (wiki-turn-layer nil "ENVL")
+    layer (turn-layer nil "ENVL")
     marker (entlast)
     index 0
     clayer (getvar "clayer")
@@ -1281,22 +1303,22 @@
   (setvar "clayer" layer)
   (foreach segment vehicle
     (foreach state (nth index paths)
-      (wiki-turn-draw-pline (wiki-turn-body-corners segment state) layer T)
+      (turn-draw-pline (turn-body-corners segment state) layer T)
     )
     (setq index (1+ index))
   )
-  (setq ss (wiki-turn-selection (wiki-turn-entities-after marker)))
+  (setq ss (turn-selection (turn-entities-after marker)))
   (cond
     ((zerop (sslength ss)) (setvar "clayer" clayer) nil)
     (t
      (command "._region" ss "")
      ;; REGION consumes the polylines, so whatever survives after the marker is
      ;; the regions it made.
-     (setq regions (wiki-turn-entities-after marker))
+     (setq regions (turn-entities-after marker))
      (if (< 1 (length regions))
        (progn
-         (command "._union" (wiki-turn-selection regions) "")
-         (setq regions (wiki-turn-entities-after marker))
+         (command "._union" (turn-selection regions) "")
+         (setq regions (turn-entities-after marker))
        )
      )
      ;; AREA _Object on a region reports its area, islands already deducted.
@@ -1310,8 +1332,8 @@
      ;; LWPOLYLINE is what an engineer offsets, hatches and plots.
      (setq peditaccept (getvar "peditaccept"))
      (setvar "peditaccept" 1)
-     (command "._explode" (wiki-turn-selection regions))
-     (command "._pedit" "_multiple" (wiki-turn-selection (wiki-turn-entities-after marker)) ""
+     (command "._explode" (turn-selection regions))
+     (command "._pedit" "_multiple" (turn-selection (turn-entities-after marker)) ""
               "_join" 0.0 ""
      )
      (setvar "peditaccept" peditaccept)
@@ -1320,12 +1342,12 @@
      ;; rather than leaving as stray polylines nobody can account for.
      (setq
        slivers
-        (wiki-turn-drop-slivers (wiki-turn-entities-after marker)
-                                (* 1e-4 (wiki-turn-smallest-body-area vehicle)))
+        (turn-drop-slivers (turn-entities-after marker)
+                                (* 1e-4 (turn-smallest-body-area vehicle)))
        shut
-        (wiki-turn-close-loops (wiki-turn-entities-after marker) layer
-                               (* 1e-6 (wiki-turn-shortest-body vehicle)))
-       loops (length (wiki-turn-entities-after marker))
+        (turn-close-loops (turn-entities-after marker) layer
+                               (* 1e-6 (turn-shortest-body vehicle)))
+       loops (length (turn-entities-after marker))
      )
      (if (< 0 slivers)
        (princ (strcat "\nTURN: discarded " (itoa slivers)
@@ -1352,13 +1374,13 @@
 ;; The whole job, with no prompting anywhere: track, draw, report.
 ;; c:turn is a thin prompting shell over this. Tests call it directly, which is
 ;; why the integration suite needs no simulated keystrokes.
-(defun wiki-turn-run (vehicle course heading-0 plot-frequency / area paths)
-  (setq paths (wiki-turn-path vehicle course heading-0))
-  (wiki-turn-draw-path vehicle paths plot-frequency)
-  (if (= "Yes" (wiki-turn-getvar "general.drawenvelope"))
-    (setq area (wiki-turn-draw-envelope vehicle paths))
+(defun turn-run (vehicle course heading-0 plot-frequency / area paths)
+  (setq paths (turn-path vehicle course heading-0))
+  (turn-draw-path vehicle paths plot-frequency)
+  (if (= "Yes" (turn-getvar "general.drawenvelope"))
+    (setq area (turn-draw-envelope vehicle paths))
   )
-  (wiki-turn-report vehicle paths area)
+  (turn-report vehicle paths area)
   paths
 )
 
@@ -1366,15 +1388,15 @@
 ;; the articulation it would really settle at, and plots looking far straighter
 ;; than the truth. Advice, not a verdict: a short course is not an error, it
 ;; just does not show you much.
-(setq *wiki-turn-short-course* 5.0)
+(setq *turn-short-course* 5.0)
 
-(defun wiki-turn-report (vehicle paths area / body findings len radius ratio spacing wheelbase)
-  (setq findings (wiki-turn-findings vehicle paths))
+(defun turn-report (vehicle paths area / body findings len radius ratio spacing wheelbase)
+  (setq findings (turn-findings vehicle paths))
   (princ (strcat "\nTURN: " (itoa (length vehicle)) " segment(s), "
                  (itoa (length (car paths))) " steps."))
   (setq
-    len (wiki-turn-course-length (car paths))
-    wheelbase (wiki-turn-rig-wheelbase vehicle)
+    len (turn-course-length (car paths))
+    wheelbase (turn-rig-wheelbase vehicle)
   )
   (if (< 0.0001 wheelbase)
     (progn
@@ -1386,9 +1408,9 @@
       ;; out with gaps in it. That is not a union bug; it is the sampling being
       ;; coarser than the thing being sampled.
       (if (and (< 1 (length (car paths)))
-               (setq body (wiki-turn-shortest-body vehicle))
-               (> (setq spacing (distance (wiki-turn-guide (car (car paths)))
-                                          (wiki-turn-guide (cadr (car paths)))))
+               (setq body (turn-shortest-body vehicle))
+               (> (setq spacing (distance (turn-guide (car (car paths)))
+                                          (turn-guide (cadr (car paths)))))
                   body))
         (princ
           (strcat
@@ -1401,7 +1423,7 @@
       )
       ;; Only worth saying for something that articulates. A single unit is
       ;; tracking its true path almost immediately.
-      (if (and (cdr vehicle) (< ratio *wiki-turn-short-course*))
+      (if (and (cdr vehicle) (< ratio *turn-short-course*))
         (princ
           (strcat
             "\n  ! Short course. A trailer takes several rig lengths to settle into its"
@@ -1414,7 +1436,7 @@
   (if area
     (princ (strcat "\nTURN: swept area is " (rtos area 2 1) " square drawing units."))
   )
-  (if (setq radius (wiki-turn-min-radius (car vehicle)))
+  (if (setq radius (turn-min-radius (car vehicle)))
     (princ (strcat "\nTURN: tightest turn this vehicle can make is "
                    (rtos radius 2 2) " radius at the steering axle."))
   )
@@ -1437,8 +1459,8 @@
 ;;; vehicle block ever made still reads correctly. Do not "fix" this.
 
 (setq
-  *wiki-turn-calculationstep* nil
-  *wiki-turn-plotfrequency* 10
+  *turn-calculationstep* nil
+  *turn-plotfrequency* 10
 )
 
 ;; The calculation step to offer.
@@ -1454,33 +1476,33 @@
 ;; So the memory is offered only while it still suits this vehicle. The test is
 ;; the one that actually matters: a step at or beyond the shortest body length
 ;; guarantees gaps in the envelope.
-(defun wiki-turn-default-step (vehicle / body computed)
+(defun turn-default-step (vehicle / body computed)
   (setq
-    computed (/ (wiki-turn-seg-get (car vehicle) "wheelbase") 10.0)
-    body (wiki-turn-shortest-body vehicle)
+    computed (/ (turn-seg-get (car vehicle) "wheelbase") 10.0)
+    body (turn-shortest-body vehicle)
   )
   (cond
-    ((null *wiki-turn-calculationstep*) computed)
-    ((and body (>= *wiki-turn-calculationstep* body))
+    ((null *turn-calculationstep*) computed)
+    ((and body (>= *turn-calculationstep* body))
      (princ
-       (strcat "\nTURN: the remembered step " (rtos *wiki-turn-calculationstep* 2 2)
+       (strcat "\nTURN: the remembered step " (rtos *turn-calculationstep* 2 2)
                " is longer than this rig's shortest body ("
                (rtos body 2 2) ")."
                "\n      Offering " (rtos computed 2 2) " instead.")
      )
      computed
     )
-    (*wiki-turn-calculationstep*)
+    (*turn-calculationstep*)
   )
 )
 
-(defun wiki-turn-getdistx (basept prompt default / input)
+(defun turn-getdistx (basept prompt default / input)
   (setq input (getdist basept (strcat prompt " <" (rtos default) ">: ")))
   (if input (setq default input))
   default
 )
 
-(defun wiki-turn-getintx (prompt default / input)
+(defun turn-getintx (prompt default / input)
   (setq input (getint (strcat prompt " <" (itoa default) ">: ")))
   (if input (setq default input))
   default
@@ -1490,24 +1512,24 @@
 ;;; TURN
 ;;; ---------------------------------------------------------------------------
 (defun c:turn (/ atts course en-vehicle es-course heading-0 pick step vehicle)
-  (wiki-turn-read-layers-dat)
+  (turn-read-layers-dat)
   (setq en-vehicle (car (entsel "\nSelect vehicle block: ")))
   (cond
     ((or (null en-vehicle) (/= "INSERT" (cdr (assoc 0 (entget en-vehicle)))))
-     (wiki-turn-alert "That is not a vehicle block.\n\nRun BUILDVEHICLE (BV) to define a vehicle.")
+     (turn-alert "That is not a vehicle block.\n\nRun BUILDVEHICLE (BV) to define a vehicle.")
     )
-    ((null (setq atts (wiki-turn-block-attributes en-vehicle)))
-     (wiki-turn-alert "That block carries no vehicle dimensions.\n\nRun BUILDVEHICLE (BV) to define a vehicle.")
+    ((null (setq atts (turn-block-attributes en-vehicle)))
+     (turn-alert "That block carries no vehicle dimensions.\n\nRun BUILDVEHICLE (BV) to define a vehicle.")
     )
     (t
      (setq
-       vehicle (wiki-turn-vehicle-from-attributes atts)
+       vehicle (turn-vehicle-from-attributes atts)
        heading-0 (+ pi (cdr (assoc 50 (entget en-vehicle))))
        es-course (entsel "\nSelect the course to follow, near the end travel starts: ")
      )
      (cond
        ((null es-course) (princ "\nNothing selected."))
-       ((not (wiki-turn-curve-p (car es-course)))
+       ((not (turn-curve-p (car es-course)))
         (alert
           (princ
             (strcat
@@ -1523,21 +1545,21 @@
         (setq
           pick (cadr es-course)
           step
-           (wiki-turn-getdistx
+           (turn-getdistx
              pick
              "\nCalculation step distance along the course"
-             (wiki-turn-default-step vehicle)
+             (turn-default-step vehicle)
            )
-          *wiki-turn-calculationstep* step
-          *wiki-turn-plotfrequency*
-           (wiki-turn-getintx "\nCalculation steps to skip between vehicle plots" *wiki-turn-plotfrequency*)
-          course (wiki-turn-course-from-curve (car es-course) pick step)
+          *turn-calculationstep* step
+          *turn-plotfrequency*
+           (turn-getintx "\nCalculation steps to skip between vehicle plots" *turn-plotfrequency*)
+          course (turn-course-from-curve (car es-course) pick step)
         )
         (cond
           ((< (length course) 2) (princ "\nThe course is too short to track."))
           (t
            (command "._undo" "_begin")
-           (wiki-turn-run vehicle course heading-0 *wiki-turn-plotfrequency*)
+           (turn-run vehicle course heading-0 *turn-plotfrequency*)
            (command "._undo" "_end")
           )
         )
@@ -1551,7 +1573,7 @@
 ;;; ---------------------------------------------------------------------------
 ;;; BUILDVEHICLE
 ;;; ---------------------------------------------------------------------------
-(defun wiki-turn-make-attribute (inspoint rotation tag value prompt height layer)
+(defun turn-make-attribute (inspoint rotation tag value prompt height layer)
   (entmake
     (list
       '(0 . "ATTDEF")
@@ -1569,9 +1591,9 @@
 )
 
 ;; A rectangle centred on the segment axis, from x0 to x1, `width` across.
-(defun wiki-turn-make-box (x0 x1 y width layer / half)
+(defun turn-make-box (x0 x1 y width layer / half)
   (setq half (/ width 2.0))
-  (wiki-turn-draw-pline
+  (turn-draw-pline
     (list
       (list x0 (- y half)) (list x1 (- y half))
       (list x1 (+ y half)) (list x0 (+ y half))
@@ -1589,28 +1611,28 @@
 ;; front-hang is written the way 1.1.x wrote it: forward-positive on the
 ;; powered unit, backward-positive on a trailer. The model uses one
 ;; forward-positive convention internally, so trailers are un-negated here.
-(defun wiki-turn-segment-attributes (index segment / atts hitch)
+(defun turn-segment-attributes (index segment / atts hitch)
   (setq
-    hitch (wiki-turn-seg-get segment "hitch")
+    hitch (turn-seg-get segment "hitch")
     atts
      (list
-       (list (wiki-turn-tag index "name") (wiki-turn-seg-get segment "name"))
-       (list (wiki-turn-tag index "body-length") (rtos (wiki-turn-seg-get segment "body-length") 2))
-       (list (wiki-turn-tag index "body-width") (rtos (wiki-turn-seg-get segment "body-width") 2))
+       (list (turn-tag index "name") (turn-seg-get segment "name"))
+       (list (turn-tag index "body-length") (rtos (turn-seg-get segment "body-length") 2))
+       (list (turn-tag index "body-width") (rtos (turn-seg-get segment "body-width") 2))
        (list
-         (wiki-turn-tag index "front-hang")
+         (turn-tag index "front-hang")
          (rtos
            (if (zerop index)
-             (wiki-turn-seg-get segment "front-hang")
-             (- (wiki-turn-seg-get segment "front-hang"))
+             (turn-seg-get segment "front-hang")
+             (- (turn-seg-get segment "front-hang"))
            )
            2
          )
        )
-       (list (wiki-turn-tag index "wheelbase") (rtos (wiki-turn-seg-get segment "wheelbase") 2))
-       (list (wiki-turn-tag index "axle-width") (rtos (wiki-turn-seg-get segment "axle-width") 2))
-       (list (wiki-turn-tag index "art-angle") (angtos (wiki-turn-seg-get segment "art-angle") 0 4))
-       (list (wiki-turn-have-tag index) (if hitch "Yes" "No"))
+       (list (turn-tag index "wheelbase") (rtos (turn-seg-get segment "wheelbase") 2))
+       (list (turn-tag index "axle-width") (rtos (turn-seg-get segment "axle-width") 2))
+       (list (turn-tag index "art-angle") (angtos (turn-seg-get segment "art-angle") 0 4))
+       (list (turn-have-tag index) (if hitch "Yes" "No"))
      )
   )
   (if (zerop index)
@@ -1618,15 +1640,15 @@
       atts
        (append
          atts
-         (list (list (wiki-turn-tag index "steer-lock")
-                     (angtos (wiki-turn-seg-get segment "steer-lock") 0 4)
+         (list (list (turn-tag index "steer-lock")
+                     (angtos (turn-seg-get segment "steer-lock") 0 4)
                )
          )
        )
     )
   )
   (if hitch
-    (setq atts (append atts (list (list (wiki-turn-tag index "hitch") (rtos hitch 2)))))
+    (setq atts (append atts (list (list (turn-tag index "hitch") (rtos hitch 2)))))
   )
   atts
 )
@@ -1635,47 +1657,47 @@
 ;; base is the middle of the front bumper. The body runs off in +X and TURN
 ;; reads the heading back as (block rotation + pi), exactly as 1.1.x did, so
 ;; every vehicle block ever built still reads correctly.
-(defun wiki-turn-build-block (base vehicle / a atts axle-x guide-x hitch-x index name
+(defun turn-build-block (base vehicle / a atts axle-x guide-x hitch-x index name
                               row segment side ss text-height trail-x wheel-len
                               wheel-wid x0 x1
                              )
-  (wiki-turn-read-layers-dat)
+  (turn-read-layers-dat)
   (setq
     index 0
     hitch-x 0.0
     ss (ssadd)
   )
   (foreach segment vehicle
-    (wiki-turn-make-segment-layers index)
+    (turn-make-segment-layers index)
     (setq
-      atts (wiki-turn-segment-attributes index segment)
-      guide-x (if (zerop index) (wiki-turn-seg-get segment "front-hang") hitch-x)
-      trail-x (+ guide-x (wiki-turn-seg-get segment "wheelbase"))
-      x0 (- guide-x (wiki-turn-seg-get segment "front-hang"))
-      x1 (+ x0 (wiki-turn-seg-get segment "body-length"))
-      text-height (/ (wiki-turn-seg-get segment "body-width") 15.0)
-      wheel-len (/ (wiki-turn-seg-get segment "body-length") 10.0)
-      wheel-wid (/ (wiki-turn-seg-get segment "body-width") 10.0)
+      atts (turn-segment-attributes index segment)
+      guide-x (if (zerop index) (turn-seg-get segment "front-hang") hitch-x)
+      trail-x (+ guide-x (turn-seg-get segment "wheelbase"))
+      x0 (- guide-x (turn-seg-get segment "front-hang"))
+      x1 (+ x0 (turn-seg-get segment "body-length"))
+      text-height (/ (turn-seg-get segment "body-width") 15.0)
+      wheel-len (/ (turn-seg-get segment "body-length") 10.0)
+      wheel-wid (/ (turn-seg-get segment "body-width") 10.0)
     )
     (ssadd
-      (wiki-turn-make-box
+      (turn-make-box
         (+ (car base) x0)
         (+ (car base) x1)
         (cadr base)
-        (wiki-turn-seg-get segment "body-width")
-        (wiki-turn-layer index "BODY")
+        (turn-seg-get segment "body-width")
+        (turn-layer index "BODY")
       )
       ss
     )
     (foreach axle-x (if (zerop index) (list guide-x trail-x) (list trail-x))
       (foreach side (list -1.0 1.0)
         (ssadd
-          (wiki-turn-make-box
+          (turn-make-box
             (+ (car base) axle-x (- (/ wheel-len 2.0)))
             (+ (car base) axle-x (/ wheel-len 2.0))
-            (+ (cadr base) (* side (/ (wiki-turn-seg-get segment "axle-width") 2.0)))
+            (+ (cadr base) (* side (/ (turn-seg-get segment "axle-width") 2.0)))
             wheel-wid
-            (wiki-turn-layer index "BODY")
+            (turn-layer index "BODY")
           )
           ss
         )
@@ -1684,7 +1706,7 @@
     (setq row 0)
     (foreach a atts
       (ssadd
-        (wiki-turn-make-attribute
+        (turn-make-attribute
           (list
             (+ (car base) x0 text-height)
             (- (cadr base) (* text-height (- (* 1.5 row) 3.0)))
@@ -1694,7 +1716,7 @@
           (cadr a)
           (car a)
           text-height
-          (wiki-turn-layer index "BODY")
+          (turn-layer index "BODY")
         )
         ss
       )
@@ -1702,14 +1724,14 @@
     )
     (setq
       hitch-x
-       (if (wiki-turn-seg-get segment "hitch")
-         (+ trail-x (wiki-turn-seg-get segment "hitch"))
+       (if (turn-seg-get segment "hitch")
+         (+ trail-x (turn-seg-get segment "hitch"))
          nil
        )
       index (1+ index)
     )
   )
-  (setq name (wiki-turn-seg-get (car vehicle) "name"))
+  (setq name (turn-seg-get (car vehicle) "name"))
   (command "._-block" (strcat "VEHICLELIB" name) base ss "")
   (command "._-insert" (strcat "VEHICLELIB" name) base "" "" "")
   (entlast)
@@ -1735,29 +1757,29 @@
 
 ;; A required distance. initget 1 refuses an empty answer, so there is no way to
 ;; fall through with nil and corrupt the arithmetic later.
-(defun wiki-turn-ask-dist (prompt)
+(defun turn-ask-dist (prompt)
   (initget 1)
   (getdist (strcat "\n" prompt ": "))
 )
 
 ;; A distance with a default. Enter takes the default.
-(defun wiki-turn-ask-dist-default (prompt default / v)
+(defun turn-ask-dist-default (prompt default / v)
   (setq v (getdist (strcat "\n" prompt " <" (rtos default 2 2) ">: ")))
   (cond (v) (default))
 )
 
-(defun wiki-turn-ask-angle-default (prompt degrees / v)
+(defun turn-ask-angle-default (prompt degrees / v)
   (setq v (getangle (strcat "\n" prompt " <" (rtos degrees 2 0) " degrees>: ")))
   (cond (v) ((* pi (/ degrees 180.0))))
 )
 
-(defun wiki-turn-ask-name (prompt default / v)
+(defun turn-ask-name (prompt default / v)
   (setq v (getstring t (strcat "\n" prompt " <" default ">: ")))
   (if (= v "") default v)
 )
 
 ;; Prompt for one segment. index 0 is the powered unit. Returns a segment.
-(defun wiki-turn-prompt-segment (index / art axle-width body-length body-width
+(defun turn-prompt-segment (index / art axle-width body-length body-width
                                  front-hang hitch name steer-lock tows wheelbase
                                 )
   (princ
@@ -1768,35 +1790,35 @@
   (cond
     ((zerop index)
      (setq
-       name (wiki-turn-ask-name "Name for this vehicle" "Truck")
-       body-length (wiki-turn-ask-dist "Overall length of the tractor body")
-       body-width (wiki-turn-ask-dist "Overall width of the tractor body, outside to outside")
-       front-hang (wiki-turn-ask-dist "Front overhang, front bumper back to the steering axle")
+       name (turn-ask-name "Name for this vehicle" "Truck")
+       body-length (turn-ask-dist "Overall length of the tractor body")
+       body-width (turn-ask-dist "Overall width of the tractor body, outside to outside")
+       front-hang (turn-ask-dist "Front overhang, front bumper back to the steering axle")
        wheelbase
-        (wiki-turn-ask-dist
+        (turn-ask-dist
           "Wheelbase, steering axle back to the rear axle (use the centroid if there are several)"
         )
-       axle-width (wiki-turn-ask-dist "Track width, centre of one tire to centre of the other")
-       steer-lock (wiki-turn-ask-angle-default "Maximum steering lock angle" 30.0)
+       axle-width (turn-ask-dist "Track width, centre of one tire to centre of the other")
+       steer-lock (turn-ask-angle-default "Maximum steering lock angle" 30.0)
      )
     )
     (t
      (setq
-       name (wiki-turn-ask-name "Name for this trailer" (strcat "Trailer" (itoa index)))
+       name (turn-ask-name "Name for this trailer" (strcat "Trailer" (itoa index)))
        wheelbase
-        (wiki-turn-ask-dist
+        (turn-ask-dist
           "Hitch back to THIS trailer's axle - the trailer's own wheelbase"
         )
-       axle-width (wiki-turn-ask-dist "Track width, centre of one tire to centre of the other")
+       axle-width (turn-ask-dist "Track width, centre of one tire to centre of the other")
        ;; Asked forward-positive, which is the common case for a semitrailer,
        ;; so the usual answer needs no minus sign.
        front-hang
-        (wiki-turn-ask-dist-default
+        (turn-ask-dist-default
           "How far the trailer nose reaches FORWARD of the hitch (0 if it starts at the hitch)"
           0.0
         )
-       body-length (wiki-turn-ask-dist "Overall length of the trailer body")
-       body-width (wiki-turn-ask-dist "Overall width of the trailer body, outside to outside")
+       body-length (turn-ask-dist "Overall length of the trailer body")
+       body-width (turn-ask-dist "Overall width of the trailer body, outside to outside")
        steer-lock 0.0
      )
     )
@@ -1807,19 +1829,19 @@
     ((= tows "Yes")
      (setq
        hitch
-        (wiki-turn-ask-dist-default
+        (turn-ask-dist-default
           (strcat
             "How far BEHIND " name "'s rear axle its hitch sits"
             "\n  (0 for a fifth wheel over the axle; negative if ahead of it)"
           )
           0.0
         )
-       art (wiki-turn-ask-angle-default "Maximum articulation angle at that hitch" 70.0)
+       art (turn-ask-angle-default "Maximum articulation angle at that hitch" 70.0)
      )
     )
     (t (setq hitch nil art 0.0))
   )
-  (wiki-turn-segment
+  (turn-segment
     name wheelbase axle-width body-length body-width front-hang hitch steer-lock art
   )
 )
@@ -1831,20 +1853,20 @@
 ;;; figures that catch a mistake: how long the rig came out, and how tight a
 ;;; turn it can make.
 
-;; Bumper to the back of the last body. Mirrors the layout wiki-turn-build-block
+;; Bumper to the back of the last body. Mirrors the layout turn-build-block
 ;; uses, so it is the length that will actually be drawn.
-(defun wiki-turn-overall-length (vehicle / guide-x hitch-x index segment tail trail-x x0 x1)
+(defun turn-overall-length (vehicle / guide-x hitch-x index segment tail trail-x x0 x1)
   (setq index 0 hitch-x 0.0 tail 0.0)
   (foreach segment vehicle
     (setq
-      guide-x (if (zerop index) (wiki-turn-seg-get segment "front-hang") hitch-x)
-      trail-x (+ guide-x (wiki-turn-seg-get segment "wheelbase"))
-      x0 (- guide-x (wiki-turn-seg-get segment "front-hang"))
-      x1 (+ x0 (wiki-turn-seg-get segment "body-length"))
+      guide-x (if (zerop index) (turn-seg-get segment "front-hang") hitch-x)
+      trail-x (+ guide-x (turn-seg-get segment "wheelbase"))
+      x0 (- guide-x (turn-seg-get segment "front-hang"))
+      x1 (+ x0 (turn-seg-get segment "body-length"))
     )
     (if (> x1 tail) (setq tail x1))
-    (if (wiki-turn-seg-get segment "hitch")
-      (setq hitch-x (+ trail-x (wiki-turn-seg-get segment "hitch")))
+    (if (turn-seg-get segment "hitch")
+      (setq hitch-x (+ trail-x (turn-seg-get segment "hitch")))
     )
     (setq index (1+ index))
   )
@@ -1855,21 +1877,21 @@
 ;; sin(steer) = wheelbase / radius. nil when no real steering lock is known -
 ;; and 0 is not a real steering lock, it is the placeholder the old vehicle
 ;; library is full of.
-(defun wiki-turn-min-radius (segment / lock)
-  (setq lock (wiki-turn-seg-get segment "steer-lock"))
+(defun turn-min-radius (segment / lock)
+  (setq lock (turn-seg-get segment "steer-lock"))
   (if (and lock (< 0.0001 lock) (< lock (/ pi 2)))
-    (/ (wiki-turn-seg-get segment "wheelbase") (sin lock))
+    (/ (turn-seg-get segment "wheelbase") (sin lock))
   )
 )
 
 ;; How far the guide axle actually travelled, summed along the lead segment's
 ;; path. Deliberately not the course object's own length: the path is what was
 ;; walked, and it is what the trailer had to respond to.
-(defun wiki-turn-course-length (states / previous total)
+(defun turn-course-length (states / previous total)
   (setq total 0.0)
   (foreach s states
-    (if previous (setq total (+ total (distance previous (wiki-turn-guide s)))))
-    (setq previous (wiki-turn-guide s))
+    (if previous (setq total (+ total (distance previous (turn-guide s)))))
+    (setq previous (turn-guide s))
   )
   total
 )
@@ -1877,33 +1899,33 @@
 ;; Front axle to the last axle in the train: every segment's wheelbase, plus
 ;; each hitch offset that carries you on to the next segment. "hitch" is nil on
 ;; the last segment, which is what ends the sum.
-(defun wiki-turn-rig-wheelbase (vehicle / hitch total)
+(defun turn-rig-wheelbase (vehicle / hitch total)
   (setq total 0.0)
   (foreach segment vehicle
-    (setq total (+ total (wiki-turn-seg-get segment "wheelbase")))
-    (if (setq hitch (wiki-turn-seg-get segment "hitch"))
+    (setq total (+ total (turn-seg-get segment "wheelbase")))
+    (if (setq hitch (turn-seg-get segment "hitch"))
       (setq total (+ total hitch))
     )
   )
   total
 )
 
-(defun wiki-turn-describe (vehicle / index radius segment)
+(defun turn-describe (vehicle / index radius segment)
   (princ "\n")
   (setq index 0)
   (foreach segment vehicle
     (princ
       (strcat "\n  " (if (zerop index) "Tractor" (strcat "Trailer " (itoa index)))
-              " \"" (wiki-turn-seg-get segment "name") "\""
-              "  body " (rtos (wiki-turn-seg-get segment "body-length") 2 2)
-              " x " (rtos (wiki-turn-seg-get segment "body-width") 2 2)
-              ",  wheelbase " (rtos (wiki-turn-seg-get segment "wheelbase") 2 2))
+              " \"" (turn-seg-get segment "name") "\""
+              "  body " (rtos (turn-seg-get segment "body-length") 2 2)
+              " x " (rtos (turn-seg-get segment "body-width") 2 2)
+              ",  wheelbase " (rtos (turn-seg-get segment "wheelbase") 2 2))
     )
     (setq index (1+ index))
   )
   (princ (strcat "\n  Overall length, bumper to tail: "
-                 (rtos (wiki-turn-overall-length vehicle) 2 2)))
-  (setq radius (wiki-turn-min-radius (car vehicle)))
+                 (rtos (turn-overall-length vehicle) 2 2)))
+  (setq radius (turn-min-radius (car vehicle)))
   (princ
     (if radius
       (strcat "\n  Tightest turn this vehicle can make: "
@@ -1914,10 +1936,153 @@
   (princ)
 )
 
+;;; ---------------------------------------------------------------------------
+;;; DRIVE - steer the rig with the cursor instead of drawing a course first.
+;;;
+;;; The cursor is the driver's eyes: the rig steers toward wherever it is, as
+;;; hard as the steering lock allows, and takes one calculation step forward
+;;; each time the cursor gets a step ahead of the guide axle. Let go of the
+;;; wheel - stop moving - and the rig stops.
+;;;
+;;; The geometry is all in SECTION 3 and all tested. What is here is only the
+;;; interaction, which is the part a test harness cannot drive: grread waits for
+;;; a human. So this function stays as thin as it can be, and everything it
+;;; decides that could be got wrong is computed by something testable.
+;;; ---------------------------------------------------------------------------
+
+;; Rubber-band the rig on screen without touching the drawing database. These
+;; vectors accumulate deliberately: each step leaves its outline behind, so the
+;; user watches the swept path build up as they drive. (redraw) clears them.
+(defun turn-flash (vehicle states / corners i)
+  (setq i -1)
+  (mapcar
+    '(lambda (segment state / corners)
+       (setq
+         i (1+ i)
+         corners (turn-body-corners segment state)
+       )
+       (grdraw (nth 0 corners) (nth 1 corners) (if (zerop i) 1 4))
+       (grdraw (nth 1 corners) (nth 2 corners) (if (zerop i) 1 4))
+       (grdraw (nth 2 corners) (nth 3 corners) (if (zerop i) 1 4))
+       (grdraw (nth 3 corners) (nth 0 corners) (if (zerop i) 1 4))
+     )
+    vehicle states
+  )
+  (princ)
+)
+
+(defun c:drive (/ atts en-vehicle heading-0 start step vehicle)
+  (turn-read-layers-dat)
+  (setq en-vehicle (car (entsel "\nSelect vehicle block: ")))
+  (cond
+    ((or (null en-vehicle) (/= "INSERT" (cdr (assoc 0 (entget en-vehicle)))))
+     (turn-alert "That is not a vehicle block.\n\nRun BUILDVEHICLE (BV) to define a vehicle.")
+    )
+    ((null (setq atts (turn-block-attributes en-vehicle)))
+     (turn-alert "That block carries no vehicle dimensions.\n\nRun BUILDVEHICLE (BV) to define a vehicle.")
+    )
+    (t
+     (setq
+       vehicle (turn-vehicle-from-attributes atts)
+       heading-0 (+ pi (cdr (assoc 50 (entget en-vehicle))))
+       ;; Same convention as TURN: the block gives the heading, the user says
+       ;; where the front axle centre is. TURN takes that from the end of the
+       ;; course; with no course drawn, it has to be asked for.
+       start (getpoint "\nStart point of the front axle centre: ")
+     )
+     (if (null start)
+       (princ "\nNothing picked.")
+       (progn
+         (setq
+           step (turn-getdistx start "\nCalculation step distance"
+                                    (turn-default-step vehicle))
+           *turn-calculationstep* step
+           *turn-plotfrequency*
+            (turn-getintx "\nCalculation steps to skip between vehicle plots"
+                               *turn-plotfrequency*)
+         )
+         (turn-drive-command vehicle start heading-0 step)
+       )
+     )
+    )
+  )
+  (princ)
+)
+
+(defun turn-drive-command (vehicle start heading-0 step / inputs lock)
+  (setq
+    lock (turn-seg-get (car vehicle) "steer-lock")
+    inputs (turn-drive-read vehicle start heading-0 step lock)
+  )
+  (redraw)
+  (cond
+    ((null inputs) (princ "\nNothing driven."))
+    (t
+     (command "._undo" "_begin")
+     (turn-run vehicle
+                    (turn-drive-path vehicle inputs start heading-0)
+                    heading-0
+                    *turn-plotfrequency*)
+     (command "._undo" "_end")
+    )
+  )
+  (princ)
+)
+
+;; The loop. Returns the list of (steer . travel) inputs the user drove, which
+;; is then handed to the same kernel a drawn course goes through.
+;;
+;; turn-drive-path replays those inputs from the start, so what gets drawn
+;; is computed by the tested kernel and not by anything that happened on screen.
+(defun turn-drive-read (vehicle start heading-0 step lock / done input inputs
+                             states steer target
+                            )
+  (princ (strcat "\nDrive with the cursor. ENTER or SPACE to finish."
+                 "\nSteering lock " (rtos (/ (* 180.0 lock) pi) 2 1) " degrees."))
+  (setq states (turn-rest-states vehicle start heading-0) inputs nil)
+  (turn-flash vehicle states)
+  (while (not done)
+    (setq input (grread T 15 0))
+    (cond
+      ;; 5 is a cursor move while tracking; 3 is a pick. Both give a point, and
+      ;; both mean the same thing here: drive toward it.
+      ((and (member (car input) '(3 5)) (listp (cadr input)))
+       (setq target (cadr input))
+       ;; ONE STEP PER CURSOR EVENT, and only once the cursor is genuinely a
+       ;; step ahead. Both halves matter:
+       ;;
+       ;; The distance gate stops the rig crawling forward on every twitch of
+       ;; the mouse. The one-step rule stops it running away: driving *until*
+       ;; the rig reaches the cursor never terminates when the cursor sits
+       ;; inside the minimum turning circle, which is a point the vehicle
+       ;; cannot reach however long it drives. A WB-67 cannot reach a spot 40
+       ;; feet abeam of it, and the first version of this loop hung trying.
+       ;;
+       ;; The mouse produces events continuously, so one step each is still
+       ;; smooth; it just cannot outrun the user.
+       (if (>= (distance (turn-guide (car states)) target) step)
+         (progn
+           (setq
+             steer (turn-steer-toward (car states) target lock)
+             states (turn-drive vehicle states steer step)
+             inputs (cons (cons steer step) inputs)
+           )
+           (turn-flash vehicle states)
+         )
+       )
+      )
+      ;; 2 is a keystroke. 13 Enter, 32 space.
+      ((and (= 2 (car input)) (member (cadr input) '(13 32))) (setq done T))
+      (t nil)
+    )
+  )
+  (reverse inputs)
+)
+
 (defun c:bv () (c:buildvehicle))
 
 (defun c:buildvehicle (/ base index keys mode oldexpert segment vehicle)
-  (setq keys (wiki-turn-library-keys))
+  (setq keys (turn-library-keys))
   (initget "Library New ?")
   (setq
     mode
@@ -1932,11 +2097,11 @@
   )
   (if (= mode "?")
     (progn
-      (wiki-turn-alert
+      (turn-alert
         (strcat "Library: pick a standard vehicle from turn-vehicles.dat.\n"
                 "New: answer prompts and define one yourself.\n\n"
                 (itoa (length keys)) " vehicles are in the library:\n"
-                (wiki-turn-key-columns keys))
+                (turn-key-columns keys))
       )
       (setq mode "Library")
     )
@@ -1946,20 +2111,20 @@
     index 0
   )
   (if (= mode "Library")
-    (setq vehicle (wiki-turn-prompt-library-vehicle keys))
+    (setq vehicle (turn-prompt-library-vehicle keys))
   )
   (if vehicle
     (progn
       (setq oldexpert (getvar "expert"))
       (setvar "expert" 5)
-      (wiki-turn-build-block base vehicle)
+      (turn-build-block base vehicle)
       (setvar "expert" oldexpert)
       (princ
-        (strcat "\n\nVehicle \"" (wiki-turn-seg-get (car vehicle) "name") "\" placed, "
+        (strcat "\n\nVehicle \"" (turn-seg-get (car vehicle) "name") "\" placed, "
                 (itoa (length vehicle)) " segment(s), as block "
-                "VEHICLELIB" (wiki-turn-seg-get (car vehicle) "name") ".")
+                "VEHICLELIB" (turn-seg-get (car vehicle) "name") ".")
       )
-      (wiki-turn-describe vehicle)
+      (turn-describe vehicle)
       (princ
         (strcat "\n\nMove it so the middle of the steering axle sits on the start of"
                 "\nyour course, rotate it to the starting direction, then run TURN.")
@@ -1971,7 +2136,7 @@
 )
 
 ;; Lay a list of keys out in columns so an alert stays readable.
-(defun wiki-turn-key-columns (keys / i out)
+(defun turn-key-columns (keys / i out)
   (setq i 0 out "")
   (foreach k keys
     (setq
@@ -1989,14 +2154,14 @@
 ;; initget accepts the list, getkword matches case-insensitively and returns the
 ;; key verbatim, and empty input returns nil so the caller can default.
 ;; See devtools/turn-probe-initget.
-(defun wiki-turn-keyword-string (keys / out)
+(defun turn-keyword-string (keys / out)
   (setq out "")
   (foreach k keys (setq out (strcat out k " ")))
   (vl-string-trim " " out)
 )
 
 ;; The name INSUNITS is currently claiming, or nil when it claims nothing.
-(defun wiki-turn-insunits-name (/ code)
+(defun turn-insunits-name (/ code)
   (setq code (getvar "insunits"))
   (cdr (assoc code '((1 . "Inches") (2 . "Feet") (3 . "Miles") (4 . "Millimeters")
                      (5 . "Centimeters") (6 . "Meters") (7 . "Kilometers")
@@ -2010,11 +2175,11 @@
 ;; acad.dwt declares inches - so a civil drawing that was never set up will
 ;; scale a library vehicle by twelve and look broken. Saying the numbers out
 ;; loud costs one line and turns a mystery into an obvious setting to fix.
-(defun wiki-turn-report-units (key / drawing factor library)
+(defun turn-report-units (key / drawing factor library)
   (setq
-    library (wiki-turn-units-name (wiki-turn-library-units key))
-    drawing (wiki-turn-insunits-name)
-    factor (wiki-turn-library-scale (wiki-turn-library-units key))
+    library (turn-units-name (turn-library-units key))
+    drawing (turn-insunits-name)
+    factor (turn-library-scale (turn-library-units key))
   )
   (princ (strcat "\nTURN: library records " key " in " library "."))
   (cond
@@ -2035,8 +2200,8 @@
 )
 
 ;; The tidy name for a units string out of the data file.
-(defun wiki-turn-units-name (units / m)
-  (setq m (wiki-turn-units-metres units))
+(defun turn-units-name (units / m)
+  (setq m (turn-units-metres units))
   (cond ((null m) units)
         ((equal m 0.3048 1e-9) "Feet")
         ((equal m 0.0254 1e-9) "Inches")
@@ -2047,23 +2212,23 @@
   )
 )
 
-(defun wiki-turn-prompt-library-vehicle (keys / key vehicle)
-  (princ (strcat "\nLibrary vehicles:" (wiki-turn-key-columns keys)))
+(defun turn-prompt-library-vehicle (keys / key vehicle)
+  (princ (strcat "\nLibrary vehicles:" (turn-key-columns keys)))
   ;; getkword, not getstring: it validates against the library, accepts any
   ;; case, and will not let a typo through to an alert.
-  (initget (wiki-turn-keyword-string keys))
+  (initget (turn-keyword-string keys))
   (setq key (getkword (strcat "\nVehicle key <" (car keys) ">: ")))
   (if (null key) (setq key (car keys)))
-  (wiki-turn-report-units key)
+  (turn-report-units key)
   (cond
-    ((setq vehicle (wiki-turn-library-vehicle-scaled key))
-     (princ (strcat "\n" key ": " (wiki-turn-library-description key)
-                    " (" (wiki-turn-library-units key) ", "
+    ((setq vehicle (turn-library-vehicle-scaled key))
+     (princ (strcat "\n" key ": " (turn-library-description key)
+                    " (" (turn-library-units key) ", "
                     (itoa (length vehicle)) " segments)"))
      vehicle
     )
     (t
-     (wiki-turn-alert (strcat "No vehicle called \"" key "\" is in the library."))
+     (turn-alert (strcat "No vehicle called \"" key "\" is in the library."))
      nil
     )
   )
@@ -2074,28 +2239,28 @@
   (while
     (progn
       (setq
-        segment (wiki-turn-prompt-segment index)
+        segment (turn-prompt-segment index)
         vehicle (append vehicle (list segment))
         index (1+ index)
       )
-      (and (wiki-turn-seg-get segment "hitch") (< index 12))
+      (and (turn-seg-get segment "hitch") (< index 12))
     )
   )
   ;; Redefining an existing block would otherwise raise a dialog.
   (setq oldexpert (getvar "expert"))
   (setvar "expert" 5)
-  (wiki-turn-build-block base vehicle)
+  (turn-build-block base vehicle)
   (setvar "expert" oldexpert)
   (princ
     (strcat
-      "\n\nVehicle \"" (wiki-turn-seg-get (car vehicle) "name") "\" built, "
+      "\n\nVehicle \"" (turn-seg-get (car vehicle) "name") "\" built, "
       (itoa (length vehicle)) " segment(s), as block "
       ;; Say the real block name. The VEHICLELIB prefix is added silently, and a
       ;; user who never sees it cannot find their own block.
-      "VEHICLELIB" (wiki-turn-seg-get (car vehicle) "name") "."
+      "VEHICLELIB" (turn-seg-get (car vehicle) "name") "."
     )
   )
-  (wiki-turn-describe vehicle)
+  (turn-describe vehicle)
   (princ
     (strcat
       "\n\nCheck those figures before you go on."
@@ -2107,5 +2272,5 @@
 )
 
 
-(princ (strcat "\nTURN " (wiki-turn-getvar "general.version") " loaded. Type TURN or BV."))
+(princ (strcat "\nTURN " (turn-getvar "general.version") " loaded. Type TURN, DRIVE or BV."))
 (princ)

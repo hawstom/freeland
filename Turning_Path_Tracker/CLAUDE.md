@@ -209,7 +209,7 @@ Decisions made this session, so they are not relitigated:
   in feet, in a drawing whose INSUNITS says inches, is correctly scaled by 12. Stock
   `acad.dwt` declares inches, so this bites civil users who never set it. A units *prompt*
   was written and then **reverted** — TURN states what it read and what it is doing
-  (`wiki-turn-report-units`) and leaves the setting alone. An architect legitimately works
+  (`turn-report-units`) and leaves the setting alone. An architect legitimately works
   in inches.
 - **Steering lock 30 degrees, articulation 70 degrees** are BUILDVEHICLE's defaults, and
   are real enough to drive a verdict. Accepted deliberately.
@@ -236,15 +236,15 @@ the same pipeline that left a 3-segment run's open. We close it ourselves either
 
 ## Phase 4: drive mode (2.1.0-dev, unreleased)
 The kernel can now be **driven** — a steer angle and a travel distance per step —
-instead of only following a course drawn first. `wiki-turn-drive-step`,
-`wiki-turn-rest-states`, `wiki-turn-drive` and `wiki-turn-drive-path` are in
+instead of only following a course drawn first. `turn-drive-step`,
+`turn-rest-states`, `turn-drive` and `turn-drive-path` are in
 SECTION 3 and are pure.
 
-**`wiki-turn-drive-path` returns the same shape as `wiki-turn-path`** — one list of
+**`turn-drive-path` returns the same shape as `turn-path`** — one list of
 states per segment — so the envelope, the findings and the report all work on a driven
-rig with no change. That equivalence is checked, not assumed: `tdv-test-equivalence`
+rig with no change. That equivalence is checked, not assumed: `turn-test-drive-equivalence`
 drives a rig, takes the course its guide axle actually traced, follows that course with
-`wiki-turn-path`, and compares every state. **Worst disagreement across 482 states:
+`turn-path`, and compares every state. **Worst disagreement across 482 states:
 0.000000000000.** Keep that test passing; it is what stops drive mode becoming a second
 tracking model that drifts.
 
@@ -254,7 +254,7 @@ Facts worth keeping from building it:
   The guide axle rides `wheelbase/sin(steer)`, the trailing axle `wheelbase/tan(steer)`.
   Getting that wrong made the first circle test fail by 20 ft.
 - **The integrator is first order**, because each step moves the guide along a straight
-  chord. Rather than pick a tolerance, `tdv-test-convergence` asserts that halving the
+  chord. Rather than pick a tolerance, `turn-test-drive-convergence` asserts that halving the
   step halves the error; it measures **1.989 against a predicted 2.0**.
 - **Offtracking is inward only once the turn has developed.** A rig that starts straight
   is stretched along the tangent, so its hindmost axle begins *outside* the tractor's
@@ -265,7 +265,32 @@ Facts worth keeping from building it:
   rig folds. TURN reports *"Jackknife: articulation behind Tractor reaches 93.6, limit is
   70.0"* — from the hitch, with the lock never exceeded.
 
-Still to build: the interactive `c:drive` command — a `grread` loop over this kernel.
+### `c:drive` — steering with the cursor
+Built 2026-09-14. The cursor is the driver's eyes: the rig steers toward it, as hard as
+the steering lock allows, and takes **one calculation step per cursor event**, only once
+the cursor is a full step ahead of the guide axle. Stop moving and the rig stops. ENTER
+or SPACE finishes; the collected inputs then go through `turn-drive-path` and the
+ordinary drawing, envelope and report.
+
+**One step per event is a correctness requirement, not a feel choice.** The first
+version drove *until* the rig reached the cursor, which never terminates when the
+cursor sits inside the minimum turning circle — a point the vehicle cannot reach
+however long it drives. A 20 ft wheelbase on a 30° lock cannot reach a spot 40 ft
+abeam, and that loop hung AutoCAD. Termination is now structural.
+
+`turn-steer-toward` is where the **steering lock clamps**, and the only place it
+does: a driver cannot haul the wheel past the stops, so an intention the vehicle cannot
+carry out is simply unavailable. The stepping functions still never clamp — they report
+what the geometry does and let `turn-findings` judge it. A vehicle with no lock
+recorded (every library vehicle's angle is the zeroed placeholder) is not clamped at
+all; we do not invent a limit.
+
+The `grread` loop itself cannot be tested unattended — it waits for a human. So it is
+kept as thin as possible, and the rule it implements is restated in
+`turn-test-drive-cursor-rule` and run headless, including the unreachable-cursor case.
+
+**Still to hand-test:** the feel of it, and whether the accumulating `grdraw` outlines
+are the right thing to see while driving.
 
 **The trunk carries `-dev` in its version and `turn-release.py` refuses to publish while
 it does**, so the shipped 2.0.0 cannot be overwritten by work in progress. Drop the
@@ -320,19 +345,27 @@ Results land in `devtools/turn-test-log.md`. **All pass as of 2026-09-13: 106 ke
 ### How a `.scr` must end
 Two lines, always:
 
-    (tt-safe-quit)
+    (turn-test-safe-quit)
     quit
 
-**The "Save changes?" prompt on QUIT is a modal task dialog, not a command line
-prompt, and FILEDIA does not change that.** No script line can answer it: `quit`
-followed by `y` *or* by `n` both leave AutoCAD sitting there forever holding the
-process. Tom found a session parked exactly there. `y` is the worse of the two — it
-also wants a filename.
+**QUIT on a dirty drawing asks whether to save, at the command line**, and in an
+unattended `/b` run nothing we have tried answers it. Measured, with FILEDIA 0 and
+DBMOD 5:
 
-The only reliable exit is to leave the drawing **saved**, so QUIT has nothing to ask
-about. `tt-safe-quit` (in `turn-dev-paths.lsp`) does that: if DBMOD says the drawing
-is dirty it SAVEAS-es to `turn-scratch.dwg`, otherwise it does nothing. `tt-finish`
-always saves too, even when the caller wants no output file.
+| ending | result |
+|---|---|
+| `quit` then `y` | parks forever — `y` then wants a *filename* |
+| `quit` then `n` | parks forever |
+| `(command "._quit" "_N")` from LISP | parks forever |
+| drawing already saved | **exits cleanly, every time** |
+
+Tom found a session sitting at exactly that prompt. Do not theorise about why the
+scripted answers do not take — the useful fact is the last row.
+
+The reliable exit is to leave the drawing **saved**, so the question is never asked.
+`turn-test-safe-quit` (in `turn-dev-paths.lsp`) does that: if DBMOD says the drawing is dirty
+it SAVEAS-es to `turn-scratch.dwg`, otherwise it does nothing. `turn-test-finish` always saves
+too, even when the caller wants no output file.
 
 **The `quit` is a script line, not part of the LISP.** `(command "._quit")` inside a
 function tears the interpreter down mid-call and logs a spurious `**ERROR**: Function
@@ -340,7 +373,16 @@ cancelled` on every run — noise that had been in every log since the harness w
 built, and exactly the kind that hides a real error.
 
 **The symptom to check for is a leftover `acad.exe`.** A run that leaves one behind
-did not exit; it is waiting on a dialog nobody can see.
+did not exit; it is waiting on a dialog nobody can see. When that happens, read the
+window title before assuming a hang:
+
+    Get-Process acad | Select-Object Id, MainWindowTitle
+
+It will not always say what you expect. A curve-test run that passed all 30 checks sat
+for 19 minutes titled **"AutoCAD Error Aborting"** — a *crash* on shutdown, not a
+prompt. Civil 3D crashes tearing down a drawing that holds a COM-created
+`AECC_ALIGNMENT`, so `turn-test-curve-drop-alignments` erases them once the assertions are done.
+A crash dialog and a wait-for-input dialog look identical from outside.
 
 ### TRUSTEDPATHS is saved in the profile, not the session
 Appending to it unconditionally adds entries on **every run**. That is how the Civil 3D
@@ -352,7 +394,7 @@ unchanged.
 
 **No paths are hardcoded.** `turn-tests.bat` sets `TURNDEV` from its own location
 (`%~dp0`); `devtools/turn-dev-paths.lsp`, loaded on the first line of every `.scr`,
-derives everything else and exposes `(tt-dev "x")`, `(tt-src "x")` and `(tt-gnu "x")`.
+derives everything else and exposes `(turn-test-dev "x")`, `(turn-test-src "x")` and `(turn-test-gnu "x")`.
 Clone the tree anywhere and the tests run. AutoLISP `getenv` reads the environment the
 `.bat` hands to `acad.exe` — verified on both products, not assumed.
 
@@ -360,7 +402,7 @@ Other scripts in `devtools/`, all run the same way (`turn-tests.bat <name>`):
 
 | script | what it is for |
 |---|---|
-| `turn-release-smoke` | loads the SHIPPED `gnu/turn-2.0.0.lsp`, not the source. Run after every change. |
+| `turn-release-smoke` | loads the newest SHIPPED `gnu/turn-<version>.lsp`, not the source. Finds it by name, reads the version out of it, and calls it through whichever prefix that file uses — so it keeps working across a release and a rename. Run after every change. |
 | `turn-inspect-dwg` | everything in a user's drawing that bears on a support question |
 | `turn-inspect-plines` | polyline census by layer and vertex count — tells a drawn course from a computed path |
 | `turn-inspect-envl` | envelope loops with area, closure and end gap — the tool that found all three envelope defects |
@@ -386,9 +428,9 @@ and writes `turn-probe-aashto-log.md`.
   security check. Without it, loading from an untrusted folder raises a modal dialog.
 - Launch with `/p "AutoCAD"` or AutoCAD inherits the last-used profile and starts as Civil 3D.
 - **AutoLISP scopes arguments DYNAMICALLY, so a parameter named after a built-in shadows
-  it inside every function you call, not just your own.** `wiki-turn-drive-step` was first
+  it inside every function you call, not just your own.** `turn-drive-step` was first
   written with an argument called `distance`; it does not call `distance` itself, but
-  `wiki-turn-step` does, and that died with `bad function: 5.0` — 5.0 being the travel
+  `turn-step` does, and that died with `bad function: 5.0` — 5.0 being the travel
   distance evaluated in function position. The breakage surfaces far from the name that
   caused it. Same family as `last` below, and harder to see.
 - **AutoLISP has `last`.** Declaring a local named `last` shadows it and turns `(last x)` into
@@ -430,7 +472,7 @@ Structural gap in every 1.1.x version, including 1.1.17: **there is no swept-pat
 The body is drawn as discrete rectangles at intervals; the outer boundary of the sweep — the
 "lines for the left and right side of the vehicle" — was never drawn by any 1.1.x version.
 
-2.0 draws it. `wiki-turn-draw-envelope` puts the body outline down at every step of every
+2.0 draws it. `turn-draw-envelope` puts the body outline down at every step of every
 segment, and hands the polygon union to AutoCAD's own REGION / UNION rather than writing a
 polygon union in AutoLISP. The result is exploded and rejoined into closed polylines on
 `C-TURN-ENVL`, and its area is reported. Two things bit on the way in and are worth
@@ -445,12 +487,47 @@ remembering:
   close. A joined loop comes back with its first and last vertices coincident and its
   Closed flag off — it looks shut and is not, and hatching, offset, AREA and booleans
   all refuse it. Do not treat that as a defect to be discovered; close it yourself,
-  every time. `wiki-turn-close-loops` does it by rebuilding with `entmake` rather than
+  every time. `turn-close-loops` does it by rebuilding with `entmake` rather than
   with PEDIT Close, so the duplicated last vertex goes too instead of leaving a
   zero-length segment.
 
 Corner loci now live on their own role, `CRNR` (`C-TURN-TRCK-CRNR`), because `ENVL` belongs to
 the real envelope. `ENVL` is the one role with no segment stem: one rig sweeps one envelope.
+
+## Namespacing: there is none, so we provide it
+**AutoLISP has one global namespace.** Every symbol a file defines — function or
+variable — is visible to, and collides with, every other LISP loaded in the same
+AutoCAD session. Users load TURN alongside whatever else they have. A short, generic
+name is therefore not a style preference; it is a defect waiting for someone else's
+`turn-test-write`.
+
+**There is ONE prefix: `turn-`.** Every function and every global we define carries
+it — shipped code and test scaffolding alike. Commands are `c:turn`, `c:drive`,
+`c:buildvehicle`, `c:bv`, and `*error*` is AutoLISP's own.
+
+    313 turn-*        every function in turn.lsp and every one in devtools/
+      5 c:*           the commands
+      1 *error*
+
+**Test scaffolding is not exempt.** It loads into the same session and collides just
+as hard; the flagship names its helpers `haws-assert-equal` for exactly this reason.
+
+Sub-namespacing lives *after* the prefix, which is still one prefix:
+
+| | |
+|---|---|
+| `turn-` | the program |
+| `turn-test-` | the harness itself |
+| `turn-test-kernel-`, `turn-test-drive-`, `turn-test-integration-`, `turn-test-punch-`, `turn-test-curve-`, `turn-test-smoke-` | the suites |
+| `turn-tool-` | one-off tools over a user's drawing |
+| `turn-probe-` | one-off probes that answer a question about AutoCAD |
+
+**History:** this was consolidated 2026-09-14 on Tom's instruction, from **nineteen**
+prefixes — `wiki-turn-`, `tt-`, `ttc-`, `tti-`, `tdv-`, `tpn-`, `tcv-`, `tx-`, `ti-`,
+`tp-`, `to-`, `ev-`, `ky-`, `kr-`, `pb-`, `pi-`, `gp-`, `rs-`, `sci-`. The shipped
+file was already clean under `wiki-turn-`; `devtools/` was the mess. **`wiki-` is
+retired** — it recorded the AutoCAD Wiki origin and no longer earns its keep.
+2,304 replacements, no collisions, whole matrix green afterwards.
 
 ## Vocabulary (from the 2.0 work — worth keeping)
 - **Course** — alignment followed by a steerable guide axle

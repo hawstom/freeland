@@ -13,22 +13,22 @@
 (vl-load-com)
 
 (setq
-  *tx-lib* (tt-src "Vehicle_Library/")
-  *tx-out* (tt-src "turn-vehicles.dat")
-  *tx-log* (tt-dev "turn-extract-log.md")
+  *turn-tool-extract-lib* (turn-test-src "Vehicle_Library/")
+  *turn-tool-extract-out* (turn-test-src "turn-vehicles.dat")
+  *turn-tool-extract-log* (turn-test-dev "turn-extract-log.md")
 )
 
-(defun tx-append (path s / f)
+(defun turn-tool-extract-append (path s / f)
   (setq f (open path "a"))
   (write-line s f)
   (close f)
   (princ)
 )
-(defun tx-write (s) (tx-append *tx-out* s))
-(defun tx-note (s) (tx-append *tx-log* s) (princ (strcat "\n" s)))
+(defun turn-tool-extract-write (s) (turn-tool-extract-append *turn-tool-extract-out* s))
+(defun turn-tool-extract-note (s) (turn-tool-extract-append *turn-tool-extract-log* s) (princ (strcat "\n" s)))
 
 ;; An ObjectDBX document for this AutoCAD release.
-(defun tx-dbx (/ doc v)
+(defun turn-tool-extract-dbx (/ doc v)
   (setq v 16)
   (while (and (not doc) (< v 30))
     (setq
@@ -50,7 +50,7 @@
 ;; loose in model space, which is a block definition named *Model_Space. So
 ;; scan every block including the anonymous ones, then pick up attributes on
 ;; inserts as well for drawings that did get blocked.
-(defun tx-attributes (dbx / atts)
+(defun turn-tool-extract-attributes (dbx / atts)
   (vlax-for blk (vla-get-blocks dbx)
     (vlax-for obj blk
       (if (= "AcDbAttributeDefinition" (vla-get-objectname obj))
@@ -79,7 +79,7 @@
   (reverse atts)
 )
 
-(defun tx-num (x) (rtos x 2 4))
+(defun turn-tool-extract-num (x) (rtos x 2 4))
 
 ;; BUILDVEHICLE 1.1.x never asked for a steering lock or an articulation
 ;; angle. It hardcoded (setq vehsteerlock 0.5) and (setq vehartangle 0.5) -
@@ -90,40 +90,40 @@
 ;; 28.6" with total confidence and no basis. Absent data is safer than fake
 ;; data: a limit of 0 tells TURN not to check, and the file says why. Any
 ;; value that is NOT the placeholder is passed through untouched.
-(setq *tx-placeholder-angle* 0.5)
-(defun tx-angle (radians)
-  (if (equal radians *tx-placeholder-angle* 0.0005)
+(setq *turn-tool-extract-placeholder-angle* 0.5)
+(defun turn-tool-extract-angle (radians)
+  (if (equal radians *turn-tool-extract-placeholder-angle* 0.0005)
     "0"
     (angtos radians 0 2)
   )
 )
 
-(defun tx-placeholder-p (segment)
-  (or (equal (wiki-turn-seg-get segment "steer-lock") *tx-placeholder-angle* 0.0005)
-      (equal (wiki-turn-seg-get segment "art-angle") *tx-placeholder-angle* 0.0005)
+(defun turn-tool-extract-placeholder-p (segment)
+  (or (equal (turn-seg-get segment "steer-lock") *turn-tool-extract-placeholder-angle* 0.0005)
+      (equal (turn-seg-get segment "art-angle") *turn-tool-extract-placeholder-angle* 0.0005)
   )
 )
 
-(defun tx-segment-record (segment / hitch)
-  (setq hitch (wiki-turn-seg-get segment "hitch"))
+(defun turn-tool-extract-segment-record (segment / hitch)
+  (setq hitch (turn-seg-get segment "hitch"))
   (strcat
-    "(\"SEGMENT\" \"" (wiki-turn-seg-get segment "name") "\""
-    " " (tx-num (wiki-turn-seg-get segment "wheelbase"))
-    " " (tx-num (wiki-turn-seg-get segment "axle-width"))
-    " " (tx-num (wiki-turn-seg-get segment "body-length"))
-    " " (tx-num (wiki-turn-seg-get segment "body-width"))
-    " " (tx-num (wiki-turn-seg-get segment "front-hang"))
-    " " (if hitch (tx-num hitch) "nil")
-    " " (tx-angle (wiki-turn-seg-get segment "steer-lock"))
-    " " (tx-angle (wiki-turn-seg-get segment "art-angle"))
+    "(\"SEGMENT\" \"" (turn-seg-get segment "name") "\""
+    " " (turn-tool-extract-num (turn-seg-get segment "wheelbase"))
+    " " (turn-tool-extract-num (turn-seg-get segment "axle-width"))
+    " " (turn-tool-extract-num (turn-seg-get segment "body-length"))
+    " " (turn-tool-extract-num (turn-seg-get segment "body-width"))
+    " " (turn-tool-extract-num (turn-seg-get segment "front-hang"))
+    " " (if hitch (turn-tool-extract-num hitch) "nil")
+    " " (turn-tool-extract-angle (turn-seg-get segment "steer-lock"))
+    " " (turn-tool-extract-angle (turn-seg-get segment "art-angle"))
     ")"
   )
 )
 
-(defun tx-begin (/ f)
-  (setq f (open *tx-out* "w"))
+(defun turn-tool-extract-begin (/ f)
+  (setq f (open *turn-tool-extract-out* "w"))
   (close f)
-  (setq f (open *tx-log* "w"))
+  (setq f (open *turn-tool-extract-log* "w"))
   (close f)
   (foreach line
     (list
@@ -170,40 +170,40 @@
       ";against your own governing standard before use."
       ";"
     )
-    (tx-write line)
+    (turn-tool-extract-write line)
   )
   (princ)
 )
 
 ;; Read one drawing and append its vehicle. key is the library key.
-(defun tx-extract (file key units / atts dbx err vehicle)
-  (setq dbx (tx-dbx))
+(defun turn-tool-extract-extract (file key units / atts dbx err vehicle)
+  (setq dbx (turn-tool-extract-dbx))
   (cond
-    ((not dbx) (tx-note (strcat "!! " key ": could not create an ObjectDBX document")) nil)
+    ((not dbx) (turn-tool-extract-note (strcat "!! " key ": could not create an ObjectDBX document")) nil)
     (t
-     (setq err (vl-catch-all-apply 'vla-open (list dbx (strcat *tx-lib* file))))
+     (setq err (vl-catch-all-apply 'vla-open (list dbx (strcat *turn-tool-extract-lib* file))))
      (cond
        ((vl-catch-all-error-p err)
-        (tx-note (strcat "!! " key ": " (vl-catch-all-error-message err)))
+        (turn-tool-extract-note (strcat "!! " key ": " (vl-catch-all-error-message err)))
         nil
        )
-       ((not (assoc "VEHWHEELBASE" (setq atts (tx-attributes dbx))))
-        (tx-note (strcat "!! " key ": no VEHWHEELBASE attribute. tags found: "
+       ((not (assoc "VEHWHEELBASE" (setq atts (turn-tool-extract-attributes dbx))))
+        (turn-tool-extract-note (strcat "!! " key ": no VEHWHEELBASE attribute. tags found: "
                          (vl-princ-to-string (mapcar 'car atts))))
         nil
        )
        (t
-        (setq vehicle (wiki-turn-vehicle-from-attributes atts))
-        (tx-write "")
-        (tx-write
+        (setq vehicle (turn-vehicle-from-attributes atts))
+        (turn-tool-extract-write "")
+        (turn-tool-extract-write
           (strcat "(\"VEHICLE\" \"" key "\" \""
                   (cond ((cdr (assoc "VEHNAME" atts))) (key))
                   "\" \"" units "\")")
         )
-        (foreach s vehicle (tx-write (tx-segment-record s)))
-        (tx-note
+        (foreach s vehicle (turn-tool-extract-write (turn-tool-extract-segment-record s)))
+        (turn-tool-extract-note
           (strcat "OK " key ": " (itoa (length vehicle)) " segment(s)"
-                  (if (vl-some 'tx-placeholder-p vehicle)
+                  (if (vl-some 'turn-tool-extract-placeholder-p vehicle)
                     "  [placeholder steer/articulation angles zeroed]"
                     ""
                   )
@@ -217,16 +217,16 @@
 )
 
 ;; Everything in the library folder, in one pass, in one session.
-(defun tx-run-all (/ file key n)
-  (tx-begin)
+(defun turn-tool-extract-run-all (/ file key n)
+  (turn-tool-extract-begin)
   (setq n 0)
-  (foreach file (vl-directory-files *tx-lib* "turn-*.dwg" 1)
+  (foreach file (vl-directory-files *turn-tool-extract-lib* "turn-*.dwg" 1)
     (setq key (strcase (substr file 6 (- (strlen file) 9))))
-    (if (tx-extract file key "ft") (setq n (1+ n)))
+    (if (turn-tool-extract-extract file key "ft") (setq n (1+ n)))
   )
-  (tx-note (strcat "\nEXTRACTED " (itoa n) " vehicles"))
+  (turn-tool-extract-note (strcat "\nEXTRACTED " (itoa n) " vehicles"))
   (princ)
 )
 
-(princ "\nturn-extract-vehicles.lsp loaded. Run (tx-run-all).")
+(princ "\nturn-extract-vehicles.lsp loaded. Run (turn-tool-extract-run-all).")
 (princ)

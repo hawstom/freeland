@@ -14,18 +14,18 @@
 
 (vl-load-com)
 
-(defun ev-say (s / f)
-  (setq f (open *ev-log* "a"))
+(defun turn-tool-envl-say (s / f)
+  (setq f (open *turn-tool-envl-log* "a"))
   (write-line s f)
   (close f)
   (princ (strcat "\n" s))
   (princ)
 )
 
-(defun ev-num (x) (rtos x 2 3))
+(defun turn-tool-envl-num (x) (rtos x 2 3))
 
 ;; Distance from a polyline's first vertex to its last.
-(defun ev-end-gap (obj / co n pts)
+(defun turn-tool-envl-end-gap (obj / co n pts)
   (setq co (vlax-safearray->list (vlax-variant-value (vla-get-coordinates obj)))
         n (length co))
   (if (< n 4)
@@ -35,7 +35,7 @@
   )
 )
 
-(defun ev-dbx (/ doc v)
+(defun turn-tool-envl-dbx (/ doc v)
   (setq v 16)
   (while (and (not doc) (< v 30))
     (setq doc (vl-catch-all-apply 'vla-getinterfaceobject
@@ -47,44 +47,44 @@
   doc
 )
 
-(defun ev-run (dwg log / a big dbx err n obj small total)
-  (setq *ev-log* log)
+(defun turn-tool-envl-run (dwg log / a big dbx err n obj small total)
+  (setq *turn-tool-envl-log* log)
   (setq n (open log "w"))
   (close n)
-  (ev-say (strcat "# Envelope census: " dwg))
-  (ev-say "")
-  (setq dbx (ev-dbx))
+  (turn-tool-envl-say (strcat "# Envelope census: " dwg))
+  (turn-tool-envl-say "")
+  (setq dbx (turn-tool-envl-dbx))
   (cond
-    ((not dbx) (ev-say "!! no ObjectDBX document"))
+    ((not dbx) (turn-tool-envl-say "!! no ObjectDBX document"))
     ((vl-catch-all-error-p (setq err (vl-catch-all-apply 'vla-open (list dbx dwg))))
-     (ev-say (strcat "!! vla-open failed: " (vl-catch-all-error-message err)))
+     (turn-tool-envl-say (strcat "!! vla-open failed: " (vl-catch-all-error-message err)))
     )
     (t
      ;; Vehicle blocks, for the body dimensions that set the scale of "small".
-     (ev-say "## Vehicle blocks")
-     (ev-say "")
+     (turn-tool-envl-say "## Vehicle blocks")
+     (turn-tool-envl-say "")
      (vlax-for obj (vla-get-modelspace dbx)
        (if (and (= "AcDbBlockReference" (vla-get-objectname obj))
                 (= :vlax-true (vla-get-hasattributes obj)))
          (progn
-           (ev-say (strcat "### " (vla-get-name obj)))
+           (turn-tool-envl-say (strcat "### " (vla-get-name obj)))
            (foreach att (vlax-safearray->list
                           (vlax-variant-value (vla-getattributes obj)))
              (if (wcmatch (strcase (vla-get-tagstring att))
                           "*BODYLENGTH,*WHEELBASE,*WIDTH,*HITCH*,*FRONTHANG")
-               (ev-say (strcat "- " (vla-get-tagstring att) " = "
+               (turn-tool-envl-say (strcat "- " (vla-get-tagstring att) " = "
                                (vla-get-textstring att)))
              )
            )
-           (ev-say "")
+           (turn-tool-envl-say "")
          )
        )
      )
      ;; Every envelope loop, with area.
-     (ev-say "## C-TURN-ENVL loops")
-     (ev-say "")
-     (ev-say "| # | vertices | length | area | closed | end gap |")
-     (ev-say "|---|---|---|---|---|---|")
+     (turn-tool-envl-say "## C-TURN-ENVL loops")
+     (turn-tool-envl-say "")
+     (turn-tool-envl-say "| # | vertices | length | area | closed | end gap |")
+     (turn-tool-envl-say "|---|---|---|---|---|---|")
      (setq n 0 total 0.0 small 0 big 0)
      (vlax-for obj (vla-get-modelspace dbx)
        (if (and (= "AcDbPolyline" (vla-get-objectname obj))
@@ -100,35 +100,35 @@
            ;; AcDbPolyline has no Count property through ActiveX - asking for it
            ;; aborts the whole census. Vertices come off the coordinate array,
            ;; which is flat pairs.
-           (ev-say
+           (turn-tool-envl-say
              (strcat "| " (itoa n)
                      " | " (itoa (/ (length (vlax-safearray->list
                                               (vlax-variant-value
                                                 (vla-get-coordinates obj))))
                                     2))
-                     " | " (ev-num (vla-get-length obj))
-                     " | " (ev-num a)
+                     " | " (turn-tool-envl-num (vla-get-length obj))
+                     " | " (turn-tool-envl-num a)
                      " | " (if (= :vlax-true (vla-get-closed obj)) "yes" "no")
                      ;; An unclosed loop whose ends coincide is only missing the
                      ;; Closed flag. One with a real gap is missing geometry.
                      ;; Those need opposite fixes, so measure the gap.
-                     " | " (ev-num (ev-end-gap obj))
+                     " | " (turn-tool-envl-num (turn-tool-envl-end-gap obj))
                      " |")
            )
          )
        )
      )
-     (ev-say "")
-     (ev-say (strcat "loops: " (itoa n) "   total area: " (ev-num total)))
-     (ev-say (strcat "loops with area < 1.0 (candidate slivers): " (itoa small)))
-     (ev-say (strcat "loops with area >= 1.0: " (itoa big)))
+     (turn-tool-envl-say "")
+     (turn-tool-envl-say (strcat "loops: " (itoa n) "   total area: " (turn-tool-envl-num total)))
+     (turn-tool-envl-say (strcat "loops with area < 1.0 (candidate slivers): " (itoa small)))
+     (turn-tool-envl-say (strcat "loops with area >= 1.0: " (itoa big)))
      (vlax-release-object dbx)
     )
   )
-  (ev-say "")
-  (ev-say "END")
+  (turn-tool-envl-say "")
+  (turn-tool-envl-say "END")
   (princ)
 )
 
-(princ "\nturn-inspect-envl.lsp loaded. Run (ev-run dwg log).")
+(princ "\nturn-inspect-envl.lsp loaded. Run (turn-tool-envl-run dwg log).")
 (princ)

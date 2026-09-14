@@ -1,5 +1,5 @@
 (load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
 (setvar "cmdecho" 0)(setvar "filedia" 0)
-(load (tt-dev "turn-probe-aashto.lsp"))(pb-run)
-(tt-safe-quit)
+(load (turn-test-dev "turn-probe-aashto.lsp"))(turn-probe-aashto-run)
+(turn-test-safe-quit)
 quit

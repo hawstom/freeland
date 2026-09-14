@@ -4,11 +4,11 @@
 (setvar "attdia" 0)
 (setvar "attreq" 0)
 (setvar "blipmode" 0)
-(load (tt-dev "turn-tests.lsp"))
-(tt-start "TURN 1.1.17 baseline - generated vehicle method")
-(load (tt-gnu "turn-1.1.17.lsp"))
-(tt-clobber-builtin-alert)
-(tt-section "Test 1: BUILDVEHICLE then TURN, truck with one trailer")
+(load (turn-test-dev "turn-tests.lsp"))
+(turn-test-start "TURN 1.1.17 baseline - generated vehicle method")
+(load (turn-test-gnu "turn-1.1.17.lsp"))
+(turn-test-clobber-builtin-alert)
+(turn-test-section "Test 1: BUILDVEHICLE then TURN, truck with one trailer")
 -layer
 s
 0
@@ -46,10 +46,10 @@ g
 2,1
 
 
-(tt-report-layers)
-(tt-report-paths T)
-(tt-report-census)
-(tt-report-plines)
-(tt-finish (tt-dev "turn-tests-out.dwg"))
-(tt-safe-quit)
+(turn-test-report-layers)
+(turn-test-report-paths T)
+(turn-test-report-census)
+(turn-test-report-plines)
+(turn-test-finish (turn-test-dev "turn-tests-out.dwg"))
+(turn-test-safe-quit)
 quit

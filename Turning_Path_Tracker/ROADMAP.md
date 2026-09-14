@@ -15,7 +15,7 @@ Nothing here starts from zero. Reading the archive, the design is largely settle
 just never finished:
 
 - **The kinematics are right.** The 2002 tracking equation (`turntheo1.png`,
-  `wiki-turn-angle-turned`) is a proper bicycle model, exact for a two-wheeled vehicle, and it
+  `turn-angle-turned`) is a proper bicycle model, exact for a two-wheeled vehicle, and it
   correlates well against published AASHTO templates even for articulated rigs. This is the
   hard part of a swept-path program and it is done.
 - **The vocabulary is right.** Course / Path / Step / Segment / Tblock, from `turn-2-0-2015.lsp`.
@@ -97,17 +97,17 @@ inbox an answer this week.
 
 The architectural fight is over and the code is in `turn.lsp`:
 
-- `wiki-turn-path` walks the chain, each segment's hitch path becoming the next
+- `turn-path` walks the chain, each segment's hitch path becoming the next
   segment's course, until a segment tows nothing (`turn.lsp:681`). It is the
   `foreach` this phase predicted, not new math.
 - `BUILDVEHICLE` loops: *"Does &lt;name&gt; tow another trailer? [Yes/No]"*
   (`turn.lsp:1686`).
 - Layer keys carry a segment stem, so `TRL2-REAR-LEFT` falls out of the scheme with no
   new entry per trailer.
-- `wiki-turn-findings` enforces the articulation angle at every hitch and the steering
+- `turn-findings` enforces the articulation angle at every hitch and the steering
   lock on the powered unit — dark until someone supplies real limits, because every
   library vehicle's angles are the zeroed 0.5-radian placeholder.
-- Covered both ways: `ttc-test-chain` runs a tractor and two trailers and asserts each
+- Covered both ways: `turn-test-kernel-chain` runs a tractor and two trailers and asserts each
   segment tracks inside the one ahead; the integration suite draws a three-segment rig
   end to end.
 
@@ -133,7 +133,7 @@ one trailer to *N* is the whole architectural fight; getting from two to five is
 
 Done: `turn-vehicles.dat`, 17 vehicles, extracted from the library drawings rather
 than typed, with provenance and the placeholder angles zeroed and explained. Optional —
-its absence is a quiet fallback, proven by `ttc-test-no-data-files`.
+its absence is a quiet fallback, proven by `turn-test-kernel-no-data-files`.
 `turn-layers.dat` does the same for layer names, in the flagship's `Layers.dat`
 format.
 
@@ -177,17 +177,17 @@ Austroads vehicles, and a user can diff it. Today they would have to send DWGs.
 
 This is the phase where TURN stops being a drawing aid and becomes an analysis tool.
 
-- **Swept path envelope** — done. `wiki-turn-draw-envelope` lays the body outline down at
+- **Swept path envelope** — done. `turn-draw-envelope` lays the body outline down at
   every step of every segment, regions them, unions them, and reduces the result to closed
   polylines on `C-TURN-ENVL`. It came out as one closed boundary of the whole swept area
   rather than "a polyline per side", which is the better deliverable: it is what gets
   hatched, offset and plotted. The union is AutoCAD's, in C++ — a polygon union written in
   AutoLISP over a few hundred bodies would be too slow to use. A three-segment rig over 190
   steps takes about five seconds end to end, so no chunking was needed.
-- **Steering lock enforcement** — done. `wiki-turn-findings` compares the steer demanded at
+- **Steering lock enforcement** — done. `turn-findings` compares the steer demanded at
   every step against `VEHSTEERLOCK`, and the articulation at every hitch against
   `VEHARTANGLE`. The inputs collected since 2006 are finally read by something.
-- **A verdict** — done. `wiki-turn-report` prints the swept area, the tightest turn the
+- **A verdict** — done. `turn-report` prints the swept area, the tightest turn the
   vehicle is capable of, every finding, and then says plainly whether the manoeuvre is
   achievable as drawn.
 
@@ -216,13 +216,13 @@ describe when they say AutoTURN is easier. It is also the natural consumer of th
 already defined in 2.0.
 
 **The kinematics half is done and tested**, in the pure kernel where it can be:
-`wiki-turn-drive-step`, `wiki-turn-rest-states`, `wiki-turn-drive`,
-`wiki-turn-drive-path`. It needed no new mathematics — only the next guide point, which
+`turn-drive-step`, `turn-rest-states`, `turn-drive`,
+`turn-drive-path`. It needed no new mathematics — only the next guide point, which
 a steer angle and a travel distance determine. 35 checks.
 
-The decision that made it cheap: **`wiki-turn-drive-path` returns the same shape as
-`wiki-turn-path`**, so the envelope, the findings and the report work on a driven rig
-unchanged. `tdv-test-equivalence` proves the two agree to 0.000000000000 over 482
+The decision that made it cheap: **`turn-drive-path` returns the same shape as
+`turn-path`**, so the envelope, the findings and the report work on a driven rig
+unchanged. `turn-test-drive-equivalence` proves the two agree to 0.000000000000 over 482
 states, which is what keeps drive mode from becoming a second, drifting tracking model.
 
 Driving also reaches an analysis the drawn-course path cannot pose as naturally: a turn
@@ -230,8 +230,19 @@ that is impossible *without* exceeding the steering lock. 25° of steer on a WB-
 the tractor's trailing axle inside the trailer's own wheelbase, so the trailer can never
 settle and the rig folds — reported as a jackknife from the hitch.
 
-**What remains is the interaction, not the model:** a `grread` loop for `c:drive`, and
-the question of what the user sees while steering. That is the next build.
+**`c:drive` is built** (2026-09-14). The cursor is the driver's eyes: the rig steers
+toward it as hard as the steering lock allows, one calculation step per cursor event,
+and stops when you stop moving. ENTER or SPACE finishes and the collected inputs go
+through the ordinary drawing, envelope and report.
+
+One step per event is a correctness requirement: driving *until* the rig reaches the
+cursor never terminates when the cursor is inside the minimum turning circle, and that
+first version hung AutoCAD.
+
+**What remains is judgement, not code.** Whether driving with the cursor feels right,
+and whether accumulating `grdraw` outlines are what a user wants to see while steering,
+are questions a test harness cannot answer — `grread` waits for a human. Tom's hands
+are the next step.
 
 ### Phase 5 — Long tail
 
@@ -250,6 +261,27 @@ proving each step. Two previous rewrites stalled; a third would too.
 **2. Keep it one file.** FreeLand tools are downloaded and loaded individually by people who
 know nothing but `APPLOAD`. A vehicle library data file is a reasonable second file. An
 installer is not.
+
+## Standing constraints, not phases
+
+**AutoLISP provides no namespacing, so we provide it. One prefix: `turn-`.** There is
+a single global namespace per AutoCAD session, shared with every other application the
+user has loaded, so an unprefixed `tt-write` is a collision waiting for whoever else
+defines one. Commands are `c:turn`, `c:drive`, `c:buildvehicle`, `c:bv`.
+
+It binds test scaffolding as well as shipped code, because the harness loads into the
+same session. The flagship names its test helpers `haws-assert-equal` for this reason.
+
+Sub-namespacing goes *after* the prefix — `turn-test-`, `turn-test-drive-`,
+`turn-tool-`, `turn-probe-` — which is still one prefix.
+
+*Raised by Tom 2026-09-14 on finding unprefixed functions in `devtools/`, and
+consolidated the same day from nineteen prefixes to one. `wiki-` is retired: it
+recorded the AutoCAD Wiki origin and no longer earned its keep.*
+
+**Keep it one file, loadable by APPLOAD.** FreeLand tools are downloaded and loaded
+individually by people who know nothing but `APPLOAD`. A data file or two is
+reasonable. An installer is not.
 
 ## What I would not chase
 

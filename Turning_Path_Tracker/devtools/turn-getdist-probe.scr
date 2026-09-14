@@ -1,12 +1,12 @@
 (load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
 (setvar "cmdecho" 1)(setvar "filedia" 0)
-(load (tt-dev "turn-getdist-probe.lsp"))(gp-start)
-(gp-report "getdist typed -3" (getdist "\nProbe A, type -3: "))
+(load (turn-test-dev "turn-getdist-probe.lsp"))(turn-probe-getdist-start)
+(turn-probe-getdist-report "getdist typed -3" (getdist "\nProbe A, type -3: "))
 -3
-(gp-report "getdist typed 3" (getdist "\nProbe B, type 3: "))
+(turn-probe-getdist-report "getdist typed 3" (getdist "\nProbe B, type 3: "))
 3
-(gp-report "getreal typed -3" (getreal "\nProbe C, type -3: "))
+(turn-probe-getdist-report "getreal typed -3" (getreal "\nProbe C, type -3: "))
 -3
-(gp-done)
-(tt-safe-quit)
+(turn-probe-getdist-done)
+(turn-test-safe-quit)
 quit

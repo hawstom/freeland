@@ -5,14 +5,14 @@
 ;;; complaint is about something else. If it is zero, they are not.
 (vl-load-com)
 
-(defun to-note (s / f)
-  (setq f (open *to-log* "a"))
+(defun turn-tool-offset-note (s / f)
+  (setq f (open *turn-tool-offset-log* "a"))
   (write-line s f)
   (close f)
   (princ)
 )
 
-(defun to-dbx (/ doc v)
+(defun turn-tool-offset-dbx (/ doc v)
   (setq v 16)
   (while (and (not doc) (< v 30))
     (setq
@@ -29,7 +29,7 @@
 )
 
 ;; Flat coordinate list -> list of 2D points.
-(defun to-points (o / flat out)
+(defun turn-tool-offset-points (o / flat out)
   (setq flat (vlax-safearray->list (vlax-variant-value (vla-get-coordinates o))))
   (while flat
     (setq out (cons (list (car flat) (cadr flat)) out) flat (cddr flat))
@@ -37,24 +37,24 @@
   (reverse out)
 )
 
-(defun to-run (dwg log / course dbx err path pts)
-  (setq *to-log* log)
-  (setq f (open *to-log* "w"))
+(defun turn-tool-offset-run (dwg log / course dbx err path pts)
+  (setq *turn-tool-offset-log* log)
+  (setq f (open *turn-tool-offset-log* "w"))
   (close f)
-  (to-note (strcat "# Offset check: " dwg))
-  (to-note "")
-  (setq dbx (to-dbx))
+  (turn-tool-offset-note (strcat "# Offset check: " dwg))
+  (turn-tool-offset-note "")
+  (setq dbx (turn-tool-offset-dbx))
   (setq err (vl-catch-all-apply 'vla-open (list dbx dwg)))
   (cond
     ((vl-catch-all-error-p err)
-     (to-note (strcat "OPEN FAILED: " (vl-catch-all-error-message err)))
+     (turn-tool-offset-note (strcat "OPEN FAILED: " (vl-catch-all-error-message err)))
     )
     (t
      ;; Collect the hand-drawn course and the computed path.
      (vlax-for o (vla-get-modelspace dbx)
        (if (= "AcDbPolyline" (vla-get-objectname o))
          (progn
-           (setq pts (to-points o))
+           (setq pts (turn-tool-offset-points o))
            (if (< (length pts) 20)
              (setq course (cons (cons (vla-get-layer o) pts) course))
              (setq path (cons (cons (vla-get-layer o) pts) path))
@@ -63,39 +63,39 @@
        )
      )
      (foreach c course
-       (to-note (strcat "## Hand-drawn, layer " (car c)
+       (turn-tool-offset-note (strcat "## Hand-drawn, layer " (car c)
                         " (" (itoa (length (cdr c))) " vertices)"))
-       (to-note "")
+       (turn-tool-offset-note "")
        (foreach p (cdr c)
-         (to-note (strcat "- " (rtos (car p) 2 3) ", " (rtos (cadr p) 2 3)))
+         (turn-tool-offset-note (strcat "- " (rtos (car p) 2 3) ", " (rtos (cadr p) 2 3)))
        )
-       (to-note "")
+       (turn-tool-offset-note "")
      )
      (foreach c path
-       (to-note (strcat "## Computed, layer " (car c)
+       (turn-tool-offset-note (strcat "## Computed, layer " (car c)
                         " (" (itoa (length (cdr c))) " vertices)"))
-       (to-note "")
-       (to-note (strcat "- first vertex: " (rtos (car (nth 0 (cdr c))) 2 3)
+       (turn-tool-offset-note "")
+       (turn-tool-offset-note (strcat "- first vertex: " (rtos (car (nth 0 (cdr c))) 2 3)
                         ", " (rtos (cadr (nth 0 (cdr c))) 2 3)))
-       (to-note (strcat "- second      : " (rtos (car (nth 1 (cdr c))) 2 3)
+       (turn-tool-offset-note (strcat "- second      : " (rtos (car (nth 1 (cdr c))) 2 3)
                         ", " (rtos (cadr (nth 1 (cdr c))) 2 3)))
-       (to-note (strcat "- last vertex : "
+       (turn-tool-offset-note (strcat "- last vertex : "
                         (rtos (car (nth (1- (length (cdr c))) (cdr c))) 2 3) ", "
                         (rtos (cadr (nth (1- (length (cdr c))) (cdr c))) 2 3)))
-       (to-note "")
+       (turn-tool-offset-note "")
      )
      ;; How far is the computed path's start from the nearest end of the course?
      (if (and course path)
        (progn
-         (to-note "## Separation")
-         (to-note "")
+         (turn-tool-offset-note "## Separation")
+         (turn-tool-offset-note "")
          (foreach c course
            (foreach q path
-             (to-note
+             (turn-tool-offset-note
                (strcat "- start of computed path to start of course: "
                        (rtos (distance (nth 0 (cdr q)) (nth 0 (cdr c))) 2 4))
              )
-             (to-note
+             (turn-tool-offset-note
                (strcat "- start of computed path to end of course:   "
                        (rtos (distance (nth 0 (cdr q))
                                        (nth (1- (length (cdr c))) (cdr c))) 2 4))
@@ -106,8 +106,8 @@
      )
     )
   )
-  (to-note "")
-  (to-note "OFFSET CHECK COMPLETE")
+  (turn-tool-offset-note "")
+  (turn-tool-offset-note "OFFSET CHECK COMPLETE")
   (princ)
 )
 (princ "\nturn-inspect-offset.lsp loaded.")

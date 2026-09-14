@@ -1,8 +1,8 @@
 (load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
 (setvar "cmdecho" 0)(setvar "filedia" 0)(setvar "attdia" 0)(setvar "attreq" 0)(setvar "blipmode" 0)(setvar "osmode" 0)
-(load (tt-dev "turn-tests.lsp"))(tt-start "TURN 2.0.0 - punch list item 7, any curve not just a polyline")
-(load (tt-src "turn.lsp"))(tt-capture-alerts)
-(load (tt-dev "turn-core-tests.lsp"))
-(load (tt-dev "turn-curve-tests.lsp"))(tcv-run)(tt-finish (tt-dev "turn-curve-out.dwg"))
-(tt-safe-quit)
+(load (turn-test-dev "turn-tests.lsp"))(turn-test-start "TURN 2.0.0 - punch list item 7, any curve not just a polyline")
+(load (turn-test-src "turn.lsp"))(turn-test-capture-alerts)
+(load (turn-test-dev "turn-core-tests.lsp"))
+(load (turn-test-dev "turn-curve-tests.lsp"))(turn-test-curve-run)(turn-test-finish (turn-test-dev "turn-curve-out.dwg"))
+(turn-test-safe-quit)
 quit

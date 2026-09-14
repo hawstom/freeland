@@ -1,5 +1,5 @@
 (load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
 (setvar "cmdecho" 0)(setvar "filedia" 0)
-(load (tt-dev "turn-inspect-plines.lsp"))(tp-run (tt-src "user_help/Kenya_Caldwell/Kenya-Caldwell-test-2.dwg") (tt-src "user_help/Kenya_Caldwell/plines-2.md"))
-(tt-safe-quit)
+(load (turn-test-dev "turn-inspect-plines.lsp"))(turn-tool-plines-run (turn-test-src "user_help/Kenya_Caldwell/Kenya-Caldwell-test-2.dwg") (turn-test-src "user_help/Kenya_Caldwell/plines-2.md"))
+(turn-test-safe-quit)
 quit

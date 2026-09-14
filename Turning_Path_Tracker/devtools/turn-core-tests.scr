@@ -1,8 +1,8 @@
 (load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
 (setvar "cmdecho" 0)(setvar "filedia" 0)
-(load (tt-dev "turn-tests.lsp"))(tt-start "TURN tracking kernel unit tests, drive kernel included")
-(load (tt-src "turn.lsp"))(tt-capture-alerts)
-(load (tt-dev "turn-drive-tests.lsp"))
-(load (tt-dev "turn-core-tests.lsp"))(ttc-run-all)(tt-finish nil)
-(tt-safe-quit)
+(load (turn-test-dev "turn-tests.lsp"))(turn-test-start "TURN tracking kernel unit tests, drive kernel included")
+(load (turn-test-src "turn.lsp"))(turn-test-capture-alerts)
+(load (turn-test-dev "turn-drive-tests.lsp"))
+(load (turn-test-dev "turn-core-tests.lsp"))(turn-test-kernel-run-all)(turn-test-finish nil)
+(turn-test-safe-quit)
 quit

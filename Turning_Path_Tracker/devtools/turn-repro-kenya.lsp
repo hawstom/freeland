@@ -12,21 +12,21 @@
 (vl-load-com)
 
 (setq
-  *kr-src* (tt-src "user_help/Kenya_Caldwell/Kenya-Caldwell-test-2.dwg")
-  *kr-log* (tt-src "user_help/Kenya_Caldwell/reproduction-2.md")
+  *turn-tool-repro-src* (turn-test-src "user_help/Kenya_Caldwell/Kenya-Caldwell-test-2.dwg")
+  *turn-tool-repro-log* (turn-test-src "user_help/Kenya_Caldwell/reproduction-2.md")
   ;; She used a 2.0 calculation step: her path vertices are 2.0 apart.
-  *kr-step* 2.0
-  *kr-plotfreq* 10
+  *turn-tool-repro-step* 2.0
+  *turn-tool-repro-plotfreq* 10
 )
 
-(defun kr-note (s / f)
-  (setq f (open *kr-log* "a"))
+(defun turn-tool-repro-note (s / f)
+  (setq f (open *turn-tool-repro-log* "a"))
   (write-line s f)
   (close f)
   (princ)
 )
 
-(defun kr-dbx (/ doc v)
+(defun turn-tool-repro-dbx (/ doc v)
   (setq v 16)
   (while (and (not doc) (< v 30))
     (setq
@@ -46,12 +46,12 @@
 ;;; Lift the real inputs out of her drawing
 ;;; ---------------------------------------------------------------------------
 ;; Returns (points bulges attributes)
-(defun kr-harvest (/ atts bulges dbx err flat i n out pts)
-  (setq dbx (kr-dbx))
-  (setq err (vl-catch-all-apply 'vla-open (list dbx *kr-src*)))
+(defun turn-tool-repro-harvest (/ atts bulges dbx err flat i n out pts)
+  (setq dbx (turn-tool-repro-dbx))
+  (setq err (vl-catch-all-apply 'vla-open (list dbx *turn-tool-repro-src*)))
   (cond
     ((vl-catch-all-error-p err)
-     (kr-note (strcat "OPEN FAILED: " (vl-catch-all-error-message err)))
+     (turn-tool-repro-note (strcat "OPEN FAILED: " (vl-catch-all-error-message err)))
      nil
     )
     (t
@@ -98,7 +98,7 @@
 ;;; ---------------------------------------------------------------------------
 ;;; Rebuild them here
 ;;; ---------------------------------------------------------------------------
-(defun kr-make-course (pts bulges / i lst)
+(defun turn-tool-repro-make-course (pts bulges / i lst)
   (setq
     lst
      (list
@@ -122,7 +122,7 @@
   (entlast)
 )
 
-(defun kr-attdef (pt tag val height)
+(defun turn-tool-repro-attdef (pt tag val height)
   (entmake
     (list
       '(0 . "ATTDEF")
@@ -142,7 +142,7 @@
 ;; A block carrying her exact attribute values, at `base`, rotation 0 - which is
 ;; what her drawing has, and which makes TURN read the heading as pi (due west,
 ;; the direction her course runs).
-(defun kr-make-vehicle (atts base / a ss y)
+(defun turn-tool-repro-make-vehicle (atts base / a ss y)
   (setq ss (ssadd) y (cadr base))
   ;; a body rectangle, so the block has visible geometry
   (entmake
@@ -158,7 +158,7 @@
   (ssadd (entlast) ss)
   (foreach a atts
     (setq y (- y 1.2))
-    (ssadd (kr-attdef (list (car base) y) (car a) (cdr a) 0.5) ss)
+    (ssadd (turn-tool-repro-attdef (list (car base) y) (car a) (cdr a) 0.5) ss)
   )
   (setvar "attreq" 0)
   (setvar "attdia" 0)
@@ -171,49 +171,49 @@
 ;;; ---------------------------------------------------------------------------
 ;;; Answer TURN's prompts from a queue instead of a keyboard
 ;;; ---------------------------------------------------------------------------
-(setq *kr-entsel-queue* nil)
+(setq *turn-tool-repro-entsel-queue* nil)
 
-(defun kr-install-stubs ()
+(defun turn-tool-repro-install-stubs ()
   ;; Arity matters: AutoLISP has no optional arguments, so a stub must take
   ;; exactly as many as the call site passes. entsel is called with a prompt,
-  ;; and wiki-turn-getdistx calls getdist with a base point AND a prompt.
+  ;; and turn-getdistx calls getdist with a base point AND a prompt.
   (eval
     '(defun entsel (msg / v)
-       (setq v (car *kr-entsel-queue*) *kr-entsel-queue* (cdr *kr-entsel-queue*))
+       (setq v (car *turn-tool-repro-entsel-queue*) *turn-tool-repro-entsel-queue* (cdr *turn-tool-repro-entsel-queue*))
        v
      )
   )
   (eval '(defun getkword (msg) "Generated"))
   (eval '(defun getstring (msg) ""))
-  ;; nil makes wiki-turn-getdistx / -getintx fall through to their default,
+  ;; nil makes turn-getdistx / -getintx fall through to their default,
   ;; which we have pre-loaded with her values.
   (eval '(defun getdist (basept msg) nil))
   (eval '(defun getint (msg) nil))
-  (eval '(defun alert (msg) (kr-note (strcat "- ALERT: " (vl-princ-to-string msg))) (princ)))
+  (eval '(defun alert (msg) (turn-tool-repro-note (strcat "- ALERT: " (vl-princ-to-string msg))) (princ)))
   (princ)
 )
 
 ;;; ---------------------------------------------------------------------------
 ;;; Look at what came out
 ;;; ---------------------------------------------------------------------------
-(defun kr-points (en / flat out)
+(defun turn-tool-repro-points (en / flat out)
   (setq flat (cdr (assoc -1 (entget en))))
   (setq out nil)
   (foreach g (entget en) (if (= 10 (car g)) (setq out (cons (cdr g) out))))
   (reverse out)
 )
 
-(defun kr-report (course-start / el en i n pts ss)
-  (kr-note "")
-  (kr-note "## What TURN drew")
-  (kr-note "")
-  (kr-note "| layer | vertices | first vertex | offset from course start |")
-  (kr-note "|---|---|---|---|")
+(defun turn-tool-repro-report (course-start / el en i n pts ss)
+  (turn-tool-repro-note "")
+  (turn-tool-repro-note "## What TURN drew")
+  (turn-tool-repro-note "")
+  (turn-tool-repro-note "| layer | vertices | first vertex | offset from course start |")
+  (turn-tool-repro-note "|---|---|---|---|")
   (setq ss (ssget "_X" '((0 . "LWPOLYLINE"))) i -1)
   (if ss
     (while (setq en (ssname ss (setq i (1+ i))))
-      (setq pts (kr-points en) el (entget en))
-      (kr-note
+      (setq pts (turn-tool-repro-points en) el (entget en))
+      (turn-tool-repro-note
         (strcat "| " (cdr (assoc 8 el))
                 " | " (itoa (length pts))
                 " | " (rtos (car (car pts)) 2 3) ", " (rtos (cadr (car pts)) 2 3)
@@ -222,72 +222,72 @@
       )
     )
   )
-  (kr-note "")
+  (turn-tool-repro-note "")
 )
 
 ;;; ---------------------------------------------------------------------------
-(defun kr-run (/ atts bulges en-course en-veh err harvest pts start)
-  (setq f (open *kr-log* "w"))
+(defun turn-tool-repro-run (/ atts bulges en-course en-veh err harvest pts start)
+  (setq f (open *turn-tool-repro-log* "w"))
   (close f)
-  (kr-note "# Reproduction of Kenya's run, TURN 1.1.17")
-  (kr-note "")
-  (setq harvest (kr-harvest))
+  (turn-tool-repro-note "# Reproduction of Kenya's run, TURN 1.1.17")
+  (turn-tool-repro-note "")
+  (setq harvest (turn-tool-repro-harvest))
   (cond
-    ((not harvest) (kr-note "could not read the source drawing"))
+    ((not harvest) (turn-tool-repro-note "could not read the source drawing"))
     (t
      (setq
        pts (car harvest)
        bulges (cadr harvest)
        atts (caddr harvest)
      )
-     (kr-note (strcat "course vertices lifted: " (itoa (length pts))))
-     (kr-note (strcat "bulges: " (vl-princ-to-string bulges)))
-     (kr-note (strcat "attributes lifted: " (itoa (length atts))))
-     (kr-note (strcat "VEHWHEELWIDTH = " (cdr (assoc "VEHWHEELWIDTH" atts))))
-     (kr-note "")
+     (turn-tool-repro-note (strcat "course vertices lifted: " (itoa (length pts))))
+     (turn-tool-repro-note (strcat "bulges: " (vl-princ-to-string bulges)))
+     (turn-tool-repro-note (strcat "attributes lifted: " (itoa (length atts))))
+     (turn-tool-repro-note (strcat "VEHWHEELWIDTH = " (cdr (assoc "VEHWHEELWIDTH" atts))))
+     (turn-tool-repro-note "")
      (setq
-       en-course (kr-make-course pts bulges)
+       en-course (turn-tool-repro-make-course pts bulges)
        start (car pts)
-       en-veh (kr-make-vehicle atts (list (+ (car start) 200.0) (cadr start)))
+       en-veh (turn-tool-repro-make-vehicle atts (list (+ (car start) 200.0) (cadr start)))
      )
-     (kr-note (strcat "course start: " (rtos (car start) 2 3) ", " (rtos (cadr start) 2 3)))
-     (kr-note "")
+     (turn-tool-repro-note (strcat "course start: " (rtos (car start) 2 3) ", " (rtos (cadr start) 2 3)))
+     (turn-tool-repro-note "")
      ;; Queue the two picks TURN will make: the vehicle, then the course.
      ;; The course pick point IS its start vertex, so the osnap "_end" inside
      ;; TURN cannot miss regardless of zoom.
-     (setq *kr-entsel-queue* (list (list en-veh (list 0.0 0.0)) (list en-course start)))
+     (setq *turn-tool-repro-entsel-queue* (list (list en-veh (list 0.0 0.0)) (list en-course start)))
      (setq
-       *wiki-turn-calculationstep* *kr-step*
-       *wiki-turn-plotfrequency* *kr-plotfreq*
+       *turn-calculationstep* *turn-tool-repro-step*
+       *turn-plotfrequency* *turn-tool-repro-plotfreq*
      )
-     (kr-install-stubs)
+     (turn-tool-repro-install-stubs)
      ;; TURN finds the start of the course with (osnap pick "_end"), and osnap
      ;; measures its aperture in SCREEN pixels. Her geometry sits near
      ;; 2562, 7450 while a fresh drawing is looking at the origin, so without
      ;; this the snap has nothing on screen and quietly returns nil.
      (command "._zoom" "_extents")
-     (kr-note (strcat "osnap _end at course start -> "
+     (turn-tool-repro-note (strcat "osnap _end at course start -> "
                       (vl-princ-to-string (osnap start "_end"))))
-     (kr-note "")
-     (kr-note "running c:turn ...")
+     (turn-tool-repro-note "")
+     (turn-tool-repro-note "running c:turn ...")
      (setq err (vl-catch-all-apply 'c:turn nil))
      (if (vl-catch-all-error-p err)
-       (kr-note (strcat "!! c:turn raised: " (vl-catch-all-error-message err)))
-       (kr-note "c:turn returned normally")
+       (turn-tool-repro-note (strcat "!! c:turn raised: " (vl-catch-all-error-message err)))
+       (turn-tool-repro-note "c:turn returned normally")
      )
-     (kr-note "")
-     (kr-note "## What TURN read out of the block")
-     (kr-note "")
+     (turn-tool-repro-note "")
+     (turn-tool-repro-note "## What TURN read out of the block")
+     (turn-tool-repro-note "")
      (foreach v (list "VEHWHEELBASE" "VEHWHEELWIDTH" "VEHBODYLENGTH" "VEHFRONTHANG"
                       "VEHREARHITCH" "TRAILHAVE" "TRAILERHITCHTOWHEEL" "TRAILERWHEELWIDTH")
-       (kr-note (strcat "- " v " = "
+       (turn-tool-repro-note (strcat "- " v " = "
                         (vl-princ-to-string (eval (read v)))
                         "   [type " (vl-princ-to-string (type (eval (read v)))) "]"))
      )
-     (kr-report start)
+     (turn-tool-repro-report start)
     )
   )
-  (kr-note "REPRODUCTION COMPLETE")
+  (turn-tool-repro-note "REPRODUCTION COMPLETE")
   (princ)
 )
 (princ "\nturn-repro-kenya.lsp loaded.")
