@@ -1,0 +1,67 @@
+;TURN.LSP layer settings
+;By Thomas Gail Haws
+;
+;TURN-LAYERS.DAT
+;
+;Use this file to change TURN layer names, colors, or linetypes.
+;Put it anywhere on your AutoCAD support file search path. TURN finds it with
+;(findfile). If TURN cannot find it, the built-in defaults below are used and
+;everything still works, so this file is optional.
+;
+;Format, one entry per line:
+;    ("KEY"  "LAYER NAME"  "COLOR"  "LINETYPE")
+;
+;KEY is <segment stem>-<role>.
+;  Segment stem:  TRCK  the powered unit
+;                 TRL1  the first trailer
+;                 TRL2  the second trailer, and so on
+;  Role:          BODY       body outline plotted at intervals
+;                 FRNT-LEFT  guide axle left tire path
+;                 FRNT-RGHT  guide axle right tire path
+;                 REAR-LEFT  trailing axle left tire path
+;                 REAR-RGHT  trailing axle right tire path
+;                 HTCH       path of the hitch towing the next segment
+;                 CRNR       body corner swept paths
+;
+;One role belongs to the whole vehicle rather than to a segment, and its key
+;is the bare role with no stem:
+;                 ENVL       swept path envelope of the whole vehicle
+;
+;An empty linetype means Continuous. Do NOT name a linetype that is not loaded
+;in the drawing: -LAYER will reject it and you will silently lose the layer.
+;That is what cost TURN 1.1.9 users their tire paths.
+;
+;Only list the keys you want to change. Anything absent uses the default,
+;which is "C-TURN-" plus the key.
+;
+;Defaults, listed here so you can see the shape. Uncomment and edit to change.
+;
+;("TRCK-BODY"      "C-TURN-TRCK-BODY"       "1"  "")
+;("TRCK-FRNT-LEFT" "C-TURN-TRCK-FRNT-LEFT"  "1"  "")
+;("TRCK-FRNT-RGHT" "C-TURN-TRCK-FRNT-RGHT"  "1"  "")
+;("TRCK-REAR-LEFT" "C-TURN-TRCK-REAR-LEFT"  "2"  "")
+;("TRCK-REAR-RGHT" "C-TURN-TRCK-REAR-RGHT"  "2"  "")
+;("TRCK-HTCH"      "C-TURN-TRCK-HTCH"       "3"  "")
+;("TRCK-CRNR"      "C-TURN-TRCK-CRNR"       "6"  "")
+;("ENVL"           "C-TURN-ENVL"            "4"  "")
+;("TRL1-BODY"      "C-TURN-TRL1-BODY"       "1"  "")
+;("TRL1-REAR-LEFT" "C-TURN-TRL1-REAR-LEFT"  "2"  "")
+;
+;-----------------------------------------------------------------------------
+;LEGACY NAMES
+;-----------------------------------------------------------------------------
+;TURN 1.1.x used names that predate the four-character-field rule of the
+;National CAD Standard, and it had no third segment. If you have existing
+;drawings or layer filters built on the old names, uncomment this block to get
+;them back. New segments beyond the first trailer have no legacy equivalent
+;and will keep their TRL2, TRL3 ... names.
+;
+;("TRCK-BODY"      "C-TURN-TRCK-BODY"             "1"  "")
+;("TRCK-FRNT-LEFT" "C-TURN-TRCK-FRONT-LEFT-PATH"  "1"  "")
+;("TRCK-FRNT-RGHT" "C-TURN-TRCK-FRONT-RGHT-PATH"  "1"  "")
+;("TRCK-REAR-LEFT" "C-TURN-TRCK-REAR-LEFT-PATH"   "2"  "")
+;("TRCK-REAR-RGHT" "C-TURN-TRCK-REAR-RGHT-PATH"   "2"  "")
+;("TRCK-HTCH"      "C-TURN-HTCH-PATH"             "3"  "")
+;("TRL1-BODY"      "C-TURN-TRAL-BODY"             "4"  "")
+;("TRL1-REAR-LEFT" "C-TURN-TRAL-REAR-LEFT-PATH"   "4"  "")
+;("TRL1-REAR-RGHT" "C-TURN-TRAL-REAR-RGHT-PATH"   "4"  "")

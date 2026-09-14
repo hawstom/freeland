@@ -1,147 +1,79 @@
-;;; AutoCAD Wiki AutoLISP code header.  
-;;;
-;;; Copy this code to a file on your computer. 
-;;; Start highlighting OUTSIDE the code boxes and use the mouse or keyboard to
-;;; highlight all the code.
-;;; If you select too much, simply delete any extra from your destination file.
-;;; In Windows you may want to start below the code and use [Shift]+[Ctrl]+[Home] 
-;;; key combination to highlight all the way to the top of the article,
-;;; then still holding the [Shift] key, use the arrow keys to shrink the top of
-;;; the selection down to the beginning of the code.  Then copy and paste.
-;;; This program is free software: you can redistribute it and/or modify
-;;; it under the terms of the GNU General Public License as published by
-;;; the Free Software Foundation, either version 3 of the License, or
-;;; (at your option) any later version.
-;;;
-;;; This program is distributed in the hope that it will be useful,
-;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;;; GNU General Public License for more details.
-;;;
-;;; The working version of this software is located at the AutoCAD Wiki.
-;;; Please Be Bold in adding clarifying comments and improvements at
-;;; http://autocad.wikia.com/wiki/Turning_path_tracker_%28AutoLISP_application%29
-
-;;; This program is free software: you can redistribute it and/or modify
-;;; it under the terms of the GNU General Public License as published by
-;;; the Free Software Foundation, either version 3 of the License, or
-;;; (at your option) any later version.
-;;;
-;;; This program is distributed in the hope that it will be useful,
-;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;;; GNU General Public License for more details.
-;;;
-;;; The working version of this software is located at the AutoCAD Wiki.
-;;; Please Be Bold in adding clarifying comments and improvements at
-;;; http://autocad.wikia.com/wiki/Turning_path_tracker_%28AutoLISP_application%29
-
-;;; This program is free software: you can redistribute it and/or modify
-;;; it under the terms of the GNU General Public License as published by
-;;; the Free Software Foundation, either version 3 of the License, or
-;;; (at your option) any later version.
-;;;
-;;; This program is distributed in the hope that it will be useful,
-;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;;; GNU General Public License for more details.
-;;;
-;;; The working version of this software is located at the AutoCAD Wiki.
-;;; Please Be Bold in adding clarifying comments and improvements at
-;;; http://autocad.wikia.com/wiki/Turning_path_tracker_%28AutoLISP_application%29
-
-;;;
-;;; TURN.LSP
-;;; Copyright 2009 Thomas Gail Haws
+;;; TURN.LSP - Turning Path Tracker
+;;; Copyright 2026 Thomas Gail Haws
 ;;; Copyright 2008 Stephen Hitchcox
-;;; TURN.LSP draws vehicle turning paths in AutoCAD.
 ;;;
-;;; OVERVIEW
-;;; TURN.LSP draws a polyline representing a theoretical rear wheel path
-;;; as it follows the polyline front wheel path of a turning/weaving
-;;; vehicle and also draws the body of the vehicle and a single trailer.
-;;; While TURN.LSP is theoretically accurate only for
-;;; two-wheeled vehicles, its tested results correlate very well to
-;;; published AASHTO turning templates, even for articulated vehicles.
+;;; This program is free software: you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation, either version 3 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; This version of TURN.LSP has no default vehicle information.  It requires
-;;; use of attributed blocks made using the sister program "BuildVehicle".
-;;; which contain all required information other than the path.  Note that
-;;; Turn.lsp at this moment is at a beta level, and has no error correction,
-;;; and does not check for minimum radius paths allowed by each vehicle.  It
-;;; also does not take into account speed, friction, slope, and other variables.
-;;; Refer to commercially available programs if you really want a verified
-;;; algorithm.
+;;; This program is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License for more details.
 ;;;
-;;; GETTING STARTED
-;;; At minimum, all TURN.LSP needs from you is a front left wheel path polyline
-;;; and a BuildVehicle block.  Try the following exercise.
+;;; ===========================================================================
+;;; VERSION 2.0.0
+;;; ===========================================================================
 ;;;
-;;; First, draw a good, long, polyline representing a front wheel path.
-;;; For good looks, begin and end the path with plenty of straight length.
-;;; then (just for convenience and clarity, not necessity) offset the
-;;; polyline the vehicle width to create the other wheel path.
+;;; WHAT CHANGED FROM 1.1.17, AND WHY
 ;;;
-;;; Second, load and run BuildVehicle.  It will ask you for all of the parameters
-;;; for your vehicle, and draw a unique attributed block.  You can build a library
-;;; of vehicles for future use.  BuildVehicle.lsp runs using "BV" or "BuildVehicle"
-;;; from the command line.  Axles should be the "centroid" of any group of multiple
-;;; axles.
+;;; 1.1.17 modelled "a truck, and maybe one trailer" as two hand-written code
+;;; paths. This version models a vehicle as an ordered list of SEGMENTS and
+;;; tracks them as a chain: each segment's hitch locus becomes the next
+;;; segment's course. Any number of trailers falls out of that for free.
 ;;;
-;;; Data for turning angles and time to turn is for future use, so enter
-;;; dummy data if you do not know it.
+;;; The tracking mathematics are unchanged. They were already right.
 ;;;
-;;; enter "N" for no trailer, but still give place holder data for the non-existent
-;;; trailer.  It will not be drawn.
+;;; The file is organised so that SECTION 3 (the kernel) is pure: it prompts
+;;; for nothing, draws nothing, and touches no drawing database. That is what
+;;; makes it testable without a human driving AutoCAD. Keep it that way.
 ;;;
-;;; The parameters are used to build a scale block of the vehicle you are
-;;; defining, which is made into a block.
+;;; SECTION 1  Settings and layers
+;;; SECTION 2  Small helpers
+;;; SECTION 3  The tracking kernel        (pure - no I/O, no prompts, no entmake)
+;;; SECTION 4  The vehicle model          (pure data)
+;;; SECTION 5  Vehicle block <-> vehicle  (drawing database I/O)
+;;; SECTION 5c The vehicle library        (vehicles as data)
+;;; SECTION 6  Drawing the results
+;;; SECTION 7  Commands
 ;;;
-;;; You can change the attributes in the block if you make a mistake, but the block
-;;; itself does not change size (it is not dynamic).
+;;; ===========================================================================
+;;; DEFINITIONS (carried forward from the 2.0 design notes, 2010-2015)
 ;;;
-;;; If you make a new block with the same name as an existing one, it will overwrite
-;;; the old one.
+;;; COURSE   An alignment followed by a steerable guide axle. A list of points.
+;;; PATH     The set of states that result from following a course.
+;;; STEP     The state at the end of one calculation interval.
+;;; SEGMENT  One rigid body of a vehicle: a tractor, a trailer, a dolly.
+;;; STATE    Where one segment is, and how it is pointed, at one instant.
+;;; VEHICLE  An ordered list of segments, powered unit first.
 ;;;
-;;; Draw the path for the vehicle as the route taken by the front left tire.  A future
-;;; version of this program might add path by centre or by right side of vehicle, to
-;;; suit other driving standards.
+;;; A SEGMENT is an alist:
+;;;   ("name"        . string)
+;;;   ("wheelbase"   . real)   guide axle to trailing axle
+;;;   ("axle-width"  . real)   track width, centre of tire to centre of tire
+;;;   ("body-length" . real)
+;;;   ("body-width"  . real)
+;;;   ("front-hang"  . real)   guide axle FORWARD to front of body (may be
+;;;                            negative; on a trailer the body starts behind
+;;;                            the hitch eye)
+;;;   ("hitch"       . real)   trailing axle BACKWARD to the hitch that tows
+;;;                            the next segment. nil when nothing is towed.
+;;;   ("steer-lock"  . real)   maximum steer angle, radians. Lead segment only.
+;;;   ("art-angle"   . real)   maximum articulation at this segment's hitch,
+;;;                            radians.
 ;;;
-;;; Move the BuildVehicle block of your choice to the beginning of the polyline path.
-;;;
-;;; Then, run TURN.  When prompted, select the BuildVehicle block, and then
-;;; select the front wheel path very near the starting end.
-;;; Turn.lsp uses the dimensions of the vehicle block for calculations.
-;;; Accept TURN.LSP's suggestions for a calculation step and plotting accuracy
-;;; or enter your own.
-;;;
-;;; Note:  Place the vehicle at the start of the path using the centre of the
-;;; FRONT LEFT WHEEL, which should be marked with an "x" type figure.  Rotate the
-;;; vehicle to the approximate correct starting angle.
-;;;
-;;; Note:  Select the LEFT WHEEL PATH (Drivers Side in most locations).  The right
-;;; side is drawn off of this.  Note that there is no functional difference
-;;; for the path of the vehicle based on where the driver is sitting.
-;;;
-;;; Turn draws several POINT objects, then erases them and draws the path of the
-;;; rear wheel, along with the tractor and trailer bodies, as well as all other tire
-;;; paths.
-;;;
-;;; REFERENCE
-;;; Vehicle dimensions (ft)                  Min. Outside   Min. Inside
-;;; Vehicle                Width  WB1  WB2   Rad            Rad. (check)
-;;; P (passenger)          7       11        24.0           13.8
-;;; SU (single truck)      8.5     20        42.0           27.8
-;;; BUS                    8.5     25        42.0           24.4
-;;; WB-40                  8.5     13   27   40.0           18.9
-;;; WB-50                  8.5     20   30   45.0           19.2
+;;; A STATE is an alist:
+;;;   ("guide"   . point)  centre of the steering axle, or the hitch eye
+;;;   ("trail"   . point)  centre of the trailing axle
+;;;   ("heading" . real)   direction the segment points, radians
+;;;   ("steer"   . real)   steer angle demanded at this step, radians
+;;;   ("turned"  . real)   heading change over this step, radians
 ;;;
 ;;; THEORY
-;;; For each computation step, a vehicle wheel pair (front and back) is assumed
-;;; to be traveling in a circle as though the steering wheel or articulating hinge
-;;; were locked.  The front and back wheels are circumscribing two concentric
-;;; circles, with the line between back and front wheel always tangent to the
-;;; inner circle being made by the back wheel, as shown:
+;;; For each step, a wheel pair is assumed to travel in a circle as though the
+;;; steering were locked. The line between rear and front wheel stays tangent
+;;; to the circle the rear wheel describes:
 ;;;
 ;;;          <= Counter-clockwise Travel
 ;;;         ooo
@@ -154,2518 +86,1907 @@
 ;;;    o/          o
 ;;;   F1 o       o
 ;;;         ooo
-;;;          => Counter-clockwise Travel
 ;;;
-;;; The initial locations of the back and front wheels are known (B0 and F0), and the
-;;; final location of the front wheel is known (F1).
-;;; Then the turned angle F0|C|F1=B0|C|B1=2*atan{sin(alpha)/[2*L/S-cos(alpha)]}
-;;; where
-;;;      S=the distance from F0 to F1
-;;;      L=the distance from B0 to F0, the wheelbase length
-;;;      alpha=angle F1|F0|B0
-;;;
-;;;
-;;; Development Notes:
-;;; DEVELOPMENT PLANS
-;;; 1) implement better error correction
-;;;
-;;; 2) collect and share correctly dimensioned standard vehicles
-;;;
-;;; 3) revise  to allow multiple
-;;; trailers
-;;;
-;;; 4) revise to draw tires centred on the tire paths
-;;;
-;;; 5) 080205 imperial scaling issue resolved, and input for dimensional information
-;;; revised to allow picks from drawing
-;;;
-(DEFUN
-   TURN-INITIALIZESETTINGS ()
-;;; REVISION HISTORY
-  (TURN-SETVAR "General.Version" "1.1.9")
-;;; Date     Programmer   Revision
-;;; 20090226 TGH          1.1.9 Minor tweak to version reporting
-;;; 20081112 TGH          1.1.8 Added layer settings functions to consolidate names in one place
-;;; 20080522 SH           1.1.7 Revised layers to an identifiable set, using AIA type standard.  placed under C for Civil
-;;;                             and using TURN as a reserve header.  also fixed trailer to draw as a box not a cross.
-;;; 20080416 TGH          1.1.6 Added block plotting method with more modular code and defined data structure.
-;;;                             combined both methods into one routine
-;;; 20080410 TGH          1.1.5 Simplified prompts, added layer defaults, and fixed a few errors.
-;;; 20080206 SH           1.1.4 Fixed Imperial dimension storage, and made input consistent to type of data
-;;; 20080120 SH           1.1.3 Various, including Centre of Wheels used instead of Outside of Wheels (vehicles
-;;;                       steer on the centroids of the wheels, not the rims), "Set-out" point added at Front Left
-;;;                       wheel
-;;; 20070327 SH           1.1.2 Trailer plotting
-;;; 20061213 TGH          1.1.1 Initial vehicle orientation from mandatory block selection instead of prompt.
-;;; 20060324 SH           1.1.0 Added BUILDVEHICLE interface to allow overhang and sideswipe analysis.
-;;; 20040507 TGH          1.0.1 Added osnap shutoff and restore.
-;;; 20021025 TGH          Replaced tracking equation with better algorithm.  Removed plot point reduction algorithm.
-;;; 20020627 TGH          Added GETDISTX function to distribution file.
-;;; 20020625 TGH          Added capability to follow reverse drawn polylines.
-;;;
-;;;----------------------------------------------------------------------------
-;;; Program settings users can edit--------------------------------------------
-;;;----------------------------------------------------------------------------
-;;;
-;;; Layer settings.
-  (TURN-SETLAYER "TruckBody" "C-TURN-TRCK-BODY" "1" "")
-  (TURN-SETLAYER "TrailerBody" "C-TURN-TRAL-BODY" "2" "")
-  (TURN-SETLAYER "HitchPath" "C-TURN-HTCH-PATH" "3" "")
-  (TURN-SETLAYER
-    "TruckBackLeftTirePath"
-    "C-TURN-TRCK-RLTR-PATH"
-    "3"
-    "dashed"
-  )
-  (TURN-SETLAYER
-    "TruckBackRightTirePath"
-    "C-TURN-TRCK-RRTR-PATH"
-    "3"
-    "dashed"
-  )
-  (TURN-SETLAYER
-    "TruckFrontRightTirePath"
-    "C-TURN-TRCK-FRTR-PATH"
-    "3"
-    "dashed"
-  )
-  (TURN-SETLAYER
-    "TrailerBackRightTirePath"
-    "C-TURN-TRAL-RLTR-PATH"
-    "4"
-    "dashed"
-  )
-  (TURN-SETLAYER
-    "TrailerBackLeftTirePath"
-    "C-TURN-TRAL-RRTR-PATH"
-    "4"
-    "dashed"
-  )
+;;; Turned angle F0|C|F1 = B0|C|B1 = 2*atan{sin(alpha)/[2*L/S-cos(alpha)]}
+;;; where S = distance F0 to F1, L = wheelbase, alpha = angle F1|F0|B0.
+;;; ===========================================================================
+
+;;; ===========================================================================
+;;; SECTION 1  SETTINGS AND LAYERS
+;;; ===========================================================================
+;;; Layer names are generated per segment so that a five-trailer rig gets five
+;;; sets of layers. Segment 0 (the powered unit) and segment 1 (the first
+;;; trailer) keep the names 1.1.x used, so existing drawings and layer filters
+;;; keep working. Segments 2 and up extend the same pattern.
+
+(setq
+  *wiki-turn-settings*
+   (list
+     ;;-----------------------------------------------------------------------
+     ;; Program settings users can edit
+     ;;-----------------------------------------------------------------------
+     ;; Colours, by role. Applied to whichever segment layers get created.
+     (list "color.body" "1" 'str)
+     (list "color.frontpath" "1" 'str)
+     (list "color.rearpath" "2" 'str)
+     (list "color.hitchpath" "3" 'str)
+     (list "color.corner" "6" 'str)
+     (list "color.envelope" "4" 'str)
+     ;; Draw the locus of each body corner (the "left and right side" lines)?
+     (list "general.drawcorners" "Yes" 'str)
+     ;; Draw the swept-path envelope - the outer boundary of everything every
+     ;; body sweeps, as a closed polyline. This is the plan-sheet deliverable.
+     (list "general.drawenvelope" "Yes" 'str)
+     ;; Warn when the course demands more steer than the vehicle has?
+     (list "general.checksteerlock" "Yes" 'str)
+     ;;-----------------------------------------------------------------------
+     ;; End of program settings users can edit
+     ;;-----------------------------------------------------------------------
+     (list "general.icadmode" "False" 'str)
+     (list "general.version" "2.0.0" 'str)
+   )
 )
-;;;
-;;;----------------------------------------------------------------------------
-;;; End of program settings users can edit-------------------------------------
-;;;----------------------------------------------------------------------------
-;;;
-;;; TURN-SETVAR
-(DEFUN
-   TURN-SETVAR (VARNAME VALUE / NEWGROUP OLDGROUP)
-;;; For future compatibility with other storage options,
-;;; We're keeping all values as strings (text).
-  ;;Put VarName and Value together into a setting group.
-  (SETQ
-    VARNAME
-     (STRCASE VARNAME)
-    NEWGROUP
-     (CONS VARNAME VALUE)
-  )
-  (COND
-    ;;If the variable is already set, then
-    ((SETQ OLDGROUP (ASSOC VARNAME *TURN:SETTINGS*))
-     ;;Replace the old setting with the new setting.
-     (SETQ *TURN:SETTINGS* (SUBST NEWGROUP OLDGROUP *TURN:SETTINGS*))
-    )
-    ;;Else,
-    (T
-     ;;Add the setting.
-     (SETQ *TURN:SETTINGS* (CONS NEWGROUP *TURN:SETTINGS*))
-    )
-  )
-)
-;;;
-;;; TURN-GETVAR
-(DEFUN
-   TURN-GETVAR (VARNAME / VARNAMEMIXED)
-  (SETQ
-    VARNAMEMIXED VARNAME
-    VARNAME
-     (STRCASE VARNAME)
-  )
-  (COND
-    ;;If the setting is found, then return it
-    ((CDR (ASSOC VARNAME *TURN:SETTINGS*)))
-    ;;Else
-    (T
-     ;;1.  Send an error message.
-     (ALERT
-       (PRINC
-         (STRCAT
-           "\nNo setting was found for "
-           VARNAMEMIXED
-           ".\nGeotables can't continue."
-         )
+
+(defun wiki-turn-setvar (var val)
+  (setq var (strcase var t))
+  (if (assoc var *wiki-turn-settings*)
+    (setq
+      *wiki-turn-settings*
+       (subst
+         (list var val (caddr (assoc var *wiki-turn-settings*)))
+         (assoc var *wiki-turn-settings*)
+         *wiki-turn-settings*
        )
-     )
-     ;;2.  Exit
-     (EXIT)
+    )
+    (setq *wiki-turn-settings* (cons (list var val 'str) *wiki-turn-settings*))
+  )
+  val
+)
+
+(defun wiki-turn-getvar (var)
+  (cadr (assoc (strcase var t) *wiki-turn-settings*))
+)
+
+;;; ---------------------------------------------------------------------------
+;;; Layers: keys in the code, names in a data file
+;;; ---------------------------------------------------------------------------
+;;; The code never mentions a layer name. It asks for a KEY, and the key is
+;;; resolved to a name, colour and linetype - from turn-layers.dat if the user
+;;; has one anywhere on the support path, otherwise from the defaults below.
+;;; This is the Layers.dat pattern from the flagship, and it is what makes a
+;;; five-trailer rig possible without inventing five sets of names in code.
+;;;
+;;; Names follow AIA / National CAD Standard: every field is exactly four
+;;; characters. 1.1.x did not manage this - C-TURN-TRCK-FRONT-LEFT-PATH has a
+;;; five-character field and two fields too many. The names below are the
+;;; compliant form. A user who needs the old names can say so in
+;;; turn-layers.dat without touching code.
+;;;
+;;; Key   = <segment stem>-<role>, e.g. TRCK-BODY, TRL1-REAR-LEFT
+;;; Stem  = TRCK for the powered unit, TRL1, TRL2 ... for towed segments
+;;; Entry = ("KEY" "LAYER NAME" "COLOUR" "LINETYPE")
+
+;; role -> (default colour setting key, description)
+(setq
+  *wiki-turn-roles*
+   '(("BODY" "color.body" "vehicle body outline at a step along the path")
+     ("FRNT-LEFT" "color.frontpath" "guide axle left tire path")
+     ("FRNT-RGHT" "color.frontpath" "guide axle right tire path")
+     ("REAR-LEFT" "color.rearpath" "trailing axle left tire path")
+     ("REAR-RGHT" "color.rearpath" "trailing axle right tire path")
+     ("HTCH" "color.hitchpath" "path of the hitch towing the next segment")
+     ("CRNR" "color.corner" "body corner swept path")
+    )
+  ;; Roles that belong to the whole vehicle rather than to one segment. Their
+  ;; keys carry no segment stem, so the layer is C-TURN-ENVL, not
+  ;; C-TURN-TRCK-ENVL: one rig sweeps one envelope.
+  *wiki-turn-vehicle-roles*
+   '(("ENVL" "color.envelope" "swept path envelope of the whole vehicle"))
+  ;; Filled in by wiki-turn-read-layers-dat. nil means "use the defaults".
+  *wiki-turn-layer-overrides* nil
+)
+
+(defun wiki-turn-segment-stem (index)
+  (if (zerop index) "TRCK" (strcat "TRL" (itoa index)))
+)
+
+;; A nil index means the whole vehicle, and the key is the bare role.
+(defun wiki-turn-layer-key (index role)
+  (if index
+    (strcat (wiki-turn-segment-stem index) "-" role)
+    role
+  )
+)
+
+;; Read turn-layers.dat if the user has one. Same shape as the flagship's
+;; Layers.dat: one parenthesised list per line, semicolon comments.
+(defun wiki-turn-read-layers-dat (/ f line lst path)
+  (if (setq path (findfile "turn-layers.dat"))
+    (progn
+      (setq f (open path "r"))
+      (while (setq line (read-line f))
+        (setq line (vl-string-trim " \t" line))
+        (if (and (< 0 (strlen line)) (= "(" (substr line 1 1)))
+          (setq lst (cons (read line) lst))
+        )
+      )
+      (close f)
+      (setq *wiki-turn-layer-overrides* (reverse lst))
+    )
+  )
+  *wiki-turn-layer-overrides*
+)
+
+;; The role's entry, whether it is a per-segment role or a whole-vehicle one.
+(defun wiki-turn-role (role)
+  (cond ((assoc role *wiki-turn-roles*))
+        ((assoc role *wiki-turn-vehicle-roles*))
+  )
+)
+
+;; (name colour linetype) for one segment and role.
+(defun wiki-turn-layer-def (index role / key override)
+  (setq
+    key (wiki-turn-layer-key index role)
+    override (assoc key *wiki-turn-layer-overrides*)
+  )
+  (if override
+    (cdr override)
+    (list
+      (strcat "C-TURN-" key)
+      (wiki-turn-getvar (cadr (wiki-turn-role role)))
+      ""
     )
   )
 )
 
-;;Sets up a layer setting
-(DEFUN
-   TURN-SETLAYER (BASENAME LANAME LACOLOR LALTYPE)
-  (TURN-SETVAR (STRCAT "Layers." BASENAME ".Name") LANAME)
-  (TURN-SETVAR (STRCAT "Layers." BASENAME ".Color") LACOLOR)
-  (TURN-SETVAR
-    (STRCAT "Layers." BASENAME ".Linetype")
-    LALTYPE
+(defun wiki-turn-layer (index role) (car (wiki-turn-layer-def index role)))
+
+;; Create a layer if it is absent. Linetype is left at Continuous on purpose:
+;; naming a linetype that is not loaded desynchronises -LAYER and silently
+;; costs you the layer, which cost 1.1.9 users their tire paths.
+;; -LAYER _make makes the new layer current, which is not what a caller asking
+;; for a layer to exist wants. Put CLAYER back.
+;;
+;; An empty linetype means Continuous. Naming a linetype that is not loaded
+;; desynchronises -LAYER and silently costs you the layer, which is what cost
+;; 1.1.9 users their tire paths: its path layers asked for "dashed".
+(defun wiki-turn-make-layer (name color description linetype / clayer)
+  (if (not (tblsearch "layer" name))
+    (progn
+      (setq clayer (getvar "clayer"))
+      (command
+        "._-layer" "_thaw" name "_on" name "_unlock" name
+        "_make" name
+        "_color" color name
+        "_description" description name
+      )
+      (if (and linetype (< 0 (strlen linetype)) (tblsearch "ltype" linetype))
+        (command "_ltype" linetype name)
+      )
+      (command "")
+      (setvar "clayer" clayer)
+    )
+  )
+  name
+)
+
+;; Every layer one segment needs. Called at run time, never at load time.
+;; 1.1.9 made its layers at LOAD time, so loading TURN in one drawing and
+;; running it in another left entmake silently failing on absent layers.
+(defun wiki-turn-make-segment-layers (index / def role)
+  (foreach role *wiki-turn-roles*
+    (setq def (wiki-turn-layer-def index (car role)))
+    (wiki-turn-make-layer
+      (car def)
+      (cadr def)
+      (strcat "TURN.LSP " (caddr role))
+      (caddr def)
+    )
   )
 )
-;;Gets a layer list from a layer base name string.
-(DEFUN
-   TURN-GETLAYER (BASENAME)
-  (LIST
-    (TURN-GETVAR (STRCAT "Layers." BASENAME ".Name"))
-    (TURN-GETVAR (STRCAT "Layers." BASENAME ".Color"))
-    (TURN-GETVAR (STRCAT "Layers." BASENAME ".Linetype"))
+
+(defun wiki-turn-make-vehicle-layers (/ def role)
+  (foreach role *wiki-turn-vehicle-roles*
+    (setq def (wiki-turn-layer-def nil (car role)))
+    (wiki-turn-make-layer
+      (car def)
+      (cadr def)
+      (strcat "TURN.LSP " (caddr role))
+      (caddr def)
+    )
   )
 )
-;;; Layer settings added by Tom Haws 2008-04-10
-(DEFUN
-   TURN-MAKELAYERS (/ LAYER)
-  ;;Layer change 2008-02-22 Stephen Hitchcox
-  (FOREACH
-     BASENAME '("TruckBody" "TrailerBody" "HitchPath"
-                "TruckBackLeftTirePath" "TruckBackRightTirePath"
-                "TruckFrontRightTirePath" "TrailerBackRightTirePath"
-                "TrailerBackLeftTirePath"
+
+;;; ===========================================================================
+;;; SECTION 2  SMALL HELPERS
+;;; ===========================================================================
+
+;; AutoLISP has no arcsine. 1.1.x carried (/ x (sqrt (- 1 (* x x)))), which is
+;; the TANGENT of the arcsine, not the arcsine. The missing atan is restored.
+(defun wiki-turn-asin (x)
+  (cond
+    ((>= x 1.0) (/ pi 2))
+    ((<= x -1.0) (/ pi -2))
+    (t (atan (/ x (sqrt (- 1.0 (* x x))))))
+  )
+)
+
+;; Fold an angle into -pi..pi so that articulation angles read as "18 degrees
+;; left", not "342 degrees right".
+(defun wiki-turn-normalize-angle (a)
+  (while (> a pi) (setq a (- a (* 2 pi))))
+  (while (<= a (- pi)) (setq a (+ a (* 2 pi))))
+  a
+)
+
+(defun wiki-turn-left (pt heading dist) (polar pt (+ heading (/ pi 2)) dist))
+(defun wiki-turn-right (pt heading dist) (polar pt (- heading (/ pi 2)) dist))
+
+;; TURN never calls (alert) directly. A modal dialog stops an unattended script
+;; dead, and redefining the built-in alert to get around that clobbers it for
+;; every other application sharing the session. So TURN owns this one and lets
+;; the caller decide how a message should behave.
+;;
+;; Set *wiki-turn-alert-handler* to a function of one string argument to
+;; redirect messages - a test harness points it at its log writer. Leave it nil
+;; and messages go to a dialog, as a user expects.
+(setq *wiki-turn-alert-handler* nil)
+(defun wiki-turn-alert (msg)
+  (princ (strcat "\n" msg))
+  (if *wiki-turn-alert-handler*
+    (apply *wiki-turn-alert-handler* (list msg))
+    (alert msg)
+  )
+  (princ)
+)
+
+;;; ===========================================================================
+;;; SECTION 3  THE TRACKING KERNEL
+;;; ===========================================================================
+;;; PURE. No prompts, no entmake, no getvar. Everything here can be called
+;;; directly from a test file. Do not add drawing code to this section.
+
+(defun wiki-turn-state (guide trail heading steer turned)
+  (list
+    (cons "guide" guide)
+    (cons "trail" trail)
+    (cons "heading" heading)
+    (cons "steer" steer)
+    (cons "turned" turned)
+  )
+)
+
+(defun wiki-turn-guide (state) (cdr (assoc "guide" state)))
+(defun wiki-turn-trail (state) (cdr (assoc "trail" state)))
+(defun wiki-turn-heading (state) (cdr (assoc "heading" state)))
+(defun wiki-turn-steer (state) (cdr (assoc "steer" state)))
+(defun wiki-turn-turned (state) (cdr (assoc "turned" state)))
+
+;; How far the segment's heading changes as its guide point moves from its
+;; current position to guide-1. This is the 2002 equation, unchanged.
+(defun wiki-turn-angle-turned (guide-0 heading-0 wheelbase guide-1 / deviation
+                               deviation-supplement direction travelled
+                              )
+  (setq travelled (distance guide-0 guide-1))
+  ;; MEASURE can place two points at the same spot on a zero-length segment.
+  ;; Without this the next expression divides by zero.
+  (if (zerop travelled)
+    0.0
+    (progn
+      (setq
+        direction (angle guide-0 guide-1)
+        deviation (- heading-0 direction)
+        deviation-supplement (- pi (abs deviation))
+      )
+      (* 2
+         (if (minusp deviation) 1 -1)
+         (atan
+           (/ (sin deviation-supplement)
+              (- (/ (* 2 wheelbase) travelled) (cos deviation-supplement))
+           )
+         )
+      )
+    )
+  )
+)
+
+;; Advance one segment by one step.
+(defun wiki-turn-step (state wheelbase guide-1 / heading-1 radius steer travelled turned)
+  (setq
+    turned (wiki-turn-angle-turned (wiki-turn-guide state) (wiki-turn-heading state) wheelbase guide-1)
+    heading-1 (+ (wiki-turn-heading state) turned)
+    travelled (distance (wiki-turn-guide state) guide-1)
+    ;; Radius the guide axle is describing this step, and the steer angle that
+    ;; radius demands. sin(steer) = wheelbase / radius for a bicycle model.
+    radius (if (zerop turned) nil (/ travelled 2 (sin (/ turned 2))))
+    steer (if radius (wiki-turn-asin (/ wheelbase radius)) 0.0)
+  )
+  (wiki-turn-state guide-1 (polar guide-1 heading-1 (- wheelbase)) heading-1 steer turned)
+)
+
+;; Track one segment along a whole course. Returns a list of states, one per
+;; course point.
+(defun wiki-turn-segment-path (wheelbase course heading-0 / guide-1 state states)
+  (setq
+    state (wiki-turn-state (car course) (polar (car course) heading-0 (- wheelbase)) heading-0 0.0 0.0)
+    states (list state)
+  )
+  (foreach guide-1 (cdr course)
+    (setq
+      state (wiki-turn-step state wheelbase guide-1)
+      states (cons state states)
+    )
+  )
+  (reverse states)
+)
+
+;; The course the NEXT segment's guide point follows: the locus of this
+;; segment's hitch, which rides a fixed distance behind its trailing axle.
+(defun wiki-turn-hitch-course (hitch states)
+  (mapcar
+    '(lambda (state) (polar (wiki-turn-trail state) (wiki-turn-heading state) (- hitch)))
+    states
+  )
+)
+
+;; THE CHAIN. Track a whole vehicle along a course.
+;; Returns a list of state-lists, one per segment, in vehicle order.
+;;
+;; The rig is assumed to start straight, so every segment starts on heading-0.
+(defun wiki-turn-path (vehicle course heading-0 / hitch paths segment states)
+  (foreach segment vehicle
+    (setq
+      states (wiki-turn-segment-path (wiki-turn-seg-get segment "wheelbase") course heading-0)
+      paths (cons states paths)
+      hitch (wiki-turn-seg-get segment "hitch")
+    )
+    (if hitch
+      (setq course (wiki-turn-hitch-course hitch states))
+    )
+  )
+  (reverse paths)
+)
+
+;; Articulation angle between two coupled segments at every step.
+(defun wiki-turn-articulation (states-lead states-follow)
+  (mapcar
+    '(lambda (a b) (wiki-turn-normalize-angle (- (wiki-turn-heading a) (wiki-turn-heading b))))
+    states-lead
+    states-follow
+  )
+)
+
+;; The four body corners of one segment in one state, front-left first, going
+;; clockwise as seen from above: FL, FR, RR, RL.
+(defun wiki-turn-body-corners (segment state / front-mid half heading rear-mid)
+  (setq
+    heading (wiki-turn-heading state)
+    half (/ (wiki-turn-seg-get segment "body-width") 2.0)
+    front-mid (polar (wiki-turn-guide state) heading (wiki-turn-seg-get segment "front-hang"))
+    rear-mid (polar front-mid heading (- (wiki-turn-seg-get segment "body-length")))
+  )
+  (list
+    (wiki-turn-left front-mid heading half)
+    (wiki-turn-right front-mid heading half)
+    (wiki-turn-right rear-mid heading half)
+    (wiki-turn-left rear-mid heading half)
+  )
+)
+
+;; The locus of one body corner across every step. Corner 0=FL 1=FR 2=RR 3=RL.
+;; These are the "lines for the left and right side of the vehicle" that no
+;; version of TURN has ever drawn.
+(defun wiki-turn-corner-locus (segment states corner)
+  (mapcar
+    '(lambda (state) (nth corner (wiki-turn-body-corners segment state)))
+    states
+  )
+)
+
+;; Tire loci for one segment: front-left, front-right, rear-left, rear-right.
+(defun wiki-turn-tire-loci (segment states / half)
+  (setq half (/ (wiki-turn-seg-get segment "axle-width") 2.0))
+  (list
+    (mapcar '(lambda (s) (wiki-turn-left (wiki-turn-guide s) (wiki-turn-heading s) half)) states)
+    (mapcar '(lambda (s) (wiki-turn-right (wiki-turn-guide s) (wiki-turn-heading s) half)) states)
+    (mapcar '(lambda (s) (wiki-turn-left (wiki-turn-trail s) (wiki-turn-heading s) half)) states)
+    (mapcar '(lambda (s) (wiki-turn-right (wiki-turn-trail s) (wiki-turn-heading s) half)) states)
+  )
+)
+
+;;; ===========================================================================
+;;; SECTION 4  THE VEHICLE MODEL
+;;; ===========================================================================
+;;; PURE. A vehicle is a list of segments. A segment is an alist.
+
+(defun wiki-turn-seg-get (segment key) (cdr (assoc key segment)))
+
+(defun wiki-turn-segment (name wheelbase axle-width body-length body-width front-hang hitch steer-lock art-angle)
+  (list
+    (cons "name" name)
+    (cons "wheelbase" wheelbase)
+    (cons "axle-width" axle-width)
+    (cons "body-length" body-length)
+    (cons "body-width" body-width)
+    (cons "front-hang" front-hang)
+    (cons "hitch" hitch)
+    (cons "steer-lock" steer-lock)
+    (cons "art-angle" art-angle)
+  )
+)
+
+;; Analysis. Given a vehicle and its path, what went wrong and where?
+;; Returns a list of finding strings. An empty list means the manoeuvre is
+;; achievable by this vehicle.
+(defun wiki-turn-findings (vehicle paths / art art-limit i index findings lead
+                           max-art max-steer segment states steer-limit
+                          )
+  (setq index 0)
+  (foreach segment vehicle
+    (setq states (nth index paths))
+    ;; Steer lock, powered unit only.
+    (if (and (zerop index) (setq steer-limit (wiki-turn-seg-get segment "steer-lock")) (< 0 steer-limit))
+      (progn
+        (setq max-steer 0.0)
+        (foreach s states
+          (if (> (abs (wiki-turn-steer s)) max-steer) (setq max-steer (abs (wiki-turn-steer s))))
+        )
+        (if (> max-steer steer-limit)
+          (setq
+            findings
+             (cons
+               (strcat
+                 "Steering lock exceeded on " (wiki-turn-seg-get segment "name")
+                 ": course demands " (angtos max-steer 0 1)
+                 ", vehicle has " (angtos steer-limit 0 1) "."
                )
-    (SETQ LAYER (TURN-GETLAYER BASENAME))
-    (COMMAND
-      "._layer"
-      "t"
-      (CAR LAYER)
-      "on"
-      (CAR LAYER)
-      "un"
-      (CAR LAYER)
-      "m"
-      (CAR LAYER)
-      "c"
-      (CADR LAYER)
-      ""
-      "lt"
-      (CADDR LAYER)
-      ""
-      ""
-    )
-  )
-)
-
-(TURN-INITIALIZESETTINGS)
-(TURN-MAKELAYERS)
-
-(DEFUN
-   C:TURN (/ METHOD VEHNAME)
-  (INITGET "User Generated ?")
-  (SETQ
-    METHOD
-     (GETKWORD
-       "\nTracking method [User block/Generated vehicle/?]: "
-     )
-  )
-  (COND
-    ((= METHOD "User") (TURN-MAIN-USER-BLOCK-METHOD))
-    ((= METHOD "Generated")
-     (SETQ
-       VEHNAME
-        (GETSTRING
-          "\nName for new vehicle or <select previously generated vehicle>: "
-        )
-     )
-     (COND
-       ((= VEHNAME "") (TURN-MAIN-GENERATED-BLOCK-METHOD))
-       (T (TURN-BUILDVEHICLE VEHNAME))
-     )
-    )
-    ((= METHOD "?")
-     (ALERT
-       (PRINC
-         (STRCAT
-           "TURN currently has two behavior methods or versions."
-           "\n\nThe User Block method doesn't keep track of as many vehicle dimensions and paths."
-           "\nIt merely drags your block along a path."
-           "\nIt also doesn't model hitches at this time, which limits its accuracy for trailers."
-           "\n\nThe Generated Vehicle method doesn't show the nuances of a vehicle as well."
-           "\nIt merely draws rectangles along with multiple calculated wheel paths."
-           "\n\nWhile we hope to harmonize the two methods, they are currently rather independent."
-          )
-       )
-     )
-    )
-  )
-  (PROMPT
-    (STRCAT
-      "\nTURN version " (TURN-GETVAR "General.Version")" , Copyright (C) 2006 Thomas Gail Haws and Stephen Hitchcox"
-      "\nTURN comes with ABSOLUTELY NO WARRANTY."
-      "\nThis is free software, and you are welcome to modify and"
-      "\nredistribute it under the terms of the GNU General Public License."
-      "\nThe latest version of TURN is always available at autocad.wikia.com"
-     )
-  )
-)
-
-;;;C:BV short form call for (TURN-BUILDVEHICLE)
-(DEFUN C:BV () (TURN-BUILDVEHICLE))
-(DEFUN
-   TURN-BUILDVEHICLE (VEHNAME)
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-;;; NEED TO ADD SETTING OF DEFAULT VALUES HERE,
-;;; THEN LOOP THROUGH TO CHANGE TO CUSTOM NUMBERS,
-;;; THEN PRESENT USER WITH COMPLETE LAYOUT BEFORE CREATING BLOCK,
-;;; AND ALLOW USER TO CHANGE BY GOING THROUGH LOOP AGAIN
-;;; <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-  ;| Code not used at this time.  Prompt hidden and default set by Tom Haws 2008-04-10
-  ;;Input change 2008-04-10 Tom Haws
-  (initget 1 "M I")
-  (SETQ VEHUNITS (GETKWORD "\nMetric or Imperial units [M/I]:  "))
-  |;
-  (SETQ VEHUNITS "M")
-  ;;Prompt change 2008-04-11 Tom Haws
-  (SETQ
-    STARTDRAWPOINT
-     (GETPOINT
-       "\nLocation to build vehicle (midpoint of front bumper):  "
-     )
-  )
-  ;;Prompt change 2008-04-10 Tom Haws
-  (SETQ
-    VEHBODYLENGTH
-     (GETDIST STARTDRAWPOINT "\nLength of vehicle body: ")
-  )
-  ;;Prompt change 2008-04-10 Tom Haws
-  (SETQ
-    VEHWIDTH
-     (* 2
-        (GETDIST STARTDRAWPOINT "\nHalf width of vehicle body: ")
-     )
-  )
-  ;; Record VEHWIDTH
-  ;; MAKEATTRIBUTE usage: (MakeAttribute InsPoint InsAngle Tag Value AttribLayer AttPrompt TextSize)
-  (MAKEATTRIBUTE
-    (POLAR STARTDRAWPOINT PI (/ VEHWIDTH 15))
-    90.0
-    "VEHWIDTH"
-    (RTOS VEHWIDTH 2)
-    "AttributeLayer"
-    "Vehicle width"
-    (/ VEHWIDTH 15)
-  )
-  (SETQ VEHBLOCKLIST (SSADD (ENTLAST)))
-  ;; Record VEHBODYLENGTH
-  (MAKEATTRIBUTE
-    (POLAR
-      (POLAR STARTDRAWPOINT (* 1.5 PI) (* VEHWIDTH 0.55))
-      0.0
-      (/ VEHBODYLENGTH 2)
-    )
-    0.0
-    "VEHBODYLENGTH"
-    (RTOS VEHBODYLENGTH 2)
-    "AttributeLayer"
-    "Vehicle body length"
-    (/ VEHWIDTH 15)
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;; Draw BODY
-  (DRAWBOX
-    (POLAR STARTDRAWPOINT (* 1.5 PI) (/ VEHWIDTH 2))
-    VEHBODYLENGTH
-    VEHWIDTH
-    "C-TURN-TRCK-BODY"
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;;Prompt change 2008-04-11 Tom Haws
-  (SETQ
-    VEHFRONTHANG
-     (GETDIST
-       STARTDRAWPOINT
-       "\nFront overhang (distance from bumper to axle): "
-     )
-  )
-  ;; Record front axle offset
-  (MAKEATTRIBUTE
-    (POLAR STARTDRAWPOINT 0.0 (/ VEHFRONTHANG 2))
-    0.0
-    "VEHFRONTHANG"
-    (RTOS VEHFRONTHANG 2)
-    "AttributeLayer"
-    "Vehicle front overhang"
-    (/ VEHWIDTH 15)
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  (SETQ VEHWHEELBASE (GETDIST "\nEnter vehicle wheelbase: "))
-  (IF (< VEHBODYLENGTH (+ VEHFRONTHANG VEHWHEELBASE))
-    (PRINC
-      "\nCaution, Vehicle Length is shorter than sum of Front Overhang and Wheelbase.  Errors could occur."
-    )
-  )
-  ;; Record rear axle location
-  (MAKEATTRIBUTE
-    (POLAR STARTDRAWPOINT 0.0 (+ VEHFRONTHANG VEHWHEELBASE))
-    90
-    "VEHWHEELBASE"
-    (RTOS VEHWHEELBASE 2)
-    "AttributeLayer"
-    "Vehicle wheelbase"
-    (/ VEHWIDTH 15)
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;; Record name of vehicle
-  (MAKEATTRIBUTE
-    (POLAR
-      STARTDRAWPOINT
-      0.0
-      (+ VEHFRONTHANG (/ VEHWHEELBASE 2))
-    )
-    0.0
-    "VEHNAME"
-    VEHNAME
-    "AttributeLayer"
-    "Vehicle name"
-    (/ VEHWIDTH 10)
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;; Record units of vehicle
-  (MAKEATTRIBUTE
-    (POLAR
-      (POLAR STARTDRAWPOINT (* 1.5 PI) (* VEHWIDTH 0.25))
-      0.0
-      (/ VEHBODYLENGTH 2)
-    )
-    0.0
-    "VEHUNITS"
-    VEHUNITS
-    "AttributeLayer"
-    "Vehicle units (Metric or Imperial)"
-    (/ VEHWIDTH 15)
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-;;; VehSteerLock isn't currently functional. Prompt hidden 2008-04-10 by Tom Haws
-  (SETQ VEHSTEERLOCK 0.5)
-  ;|
-  (SETQ VEHSTEERLOCK (GETANGLE "\nEnter vehicle Steering Lock Angle:  (note that this is required but not used at this time)"))
-  |;
-  ;; Record vehicle Steering Lock Angle
-  (MAKEATTRIBUTE
-    (POLAR STARTDRAWPOINT 0.0 (/ VEHFRONTHANG 3))
-    90.0
-    "VEHSTEERLOCK"
-    (ANGTOS VEHSTEERLOCK 0)
-    "AttributeLayer"
-    "Vehicle steering lock angle"
-    (/ VEHWIDTH 15)
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-;;; VEHSTEERLOCKTIME isn't currently functional. Prompt hidden 2008-04-10 by Tom Haws
-  (SETQ VEHSTEERLOCKTIME 0.0)
-  ;|
-  (SETQ
-    VEHSTEERLOCKTIME
-     (GETREAL "\nEnter vehicle steering lock time:  (note that this is required but not used at this time)")
-  )
-  |;
-  ;; Record vehicle steer lock time
-  (MAKEATTRIBUTE
-    (POLAR STARTDRAWPOINT 0.0 (* 2 (/ VEHFRONTHANG 3)))
-    90.0
-    "VEHSTEERLOCKTIME"
-    (RTOS VEHSTEERLOCKTIME)
-    "AttributeLayer"
-    "Vehicle steer lock time"
-    (/ VEHWIDTH 15)
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  (SETQ
-    VEHWHEELWIDTH
-     ;;Prompt change 2008-04-11 Tom Haws
-     (*
-       2
-       (GETDIST
-         STARTDRAWPOINT
-         "\nHalf of maximum axle width to middle of wheels: "
-       )
-     )
-  )
-  ;; Record wheel width
-  (MAKEATTRIBUTE
-    (POLAR STARTDRAWPOINT 0.0 VEHFRONTHANG)
-    90.0
-    "VEHWHEELWIDTH"
-    (RTOS VEHWHEELWIDTH 2)
-    "AttributeLayer"
-    "Vehicle wheel width"
-    (/ VEHWIDTH 15)
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;; Draw tires
-  ;; Define Tire Size as 1/10th of vehicle dimensions (arbitrary, could be a future setting)
-  (SETQ WHEELWIDTH (/ VEHWIDTH 10))
-  (SETQ WHEELLENGTH (/ VEHBODYLENGTH 10))
-  ;; DRAW FRONT LEFT wheel
-  (SETQ
-    WHEELFLSTARTX
-     (+ (CAR STARTDRAWPOINT)
-        (- VEHFRONTHANG (/ WHEELLENGTH 2))
-     )
-  )
-  (SETQ
-    WHEELFLSTARTY
-     (- (CADR STARTDRAWPOINT)
-        (+ (/ VEHWHEELWIDTH 2) (/ WHEELWIDTH 2))
-     )
-  )
-  (DRAWBOX
-    (LIST WHEELFLSTARTX WHEELFLSTARTY)
-    WHEELLENGTH
-    WHEELWIDTH
-    "C-TURN-TRCK-BODY"
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;; Draw front left target point
-  (SETQ TARGETX (+ (CAR STARTDRAWPOINT) VEHFRONTHANG))
-  (SETQ TARGETY (- (CADR STARTDRAWPOINT) (/ VEHWHEELWIDTH 2)))
-  (DRAWTARGET
-    (LIST TARGETX TARGETY)
-    WHEELLENGTH
-    WHEELWIDTH
-    "C-TURN-TRCK-BODY"
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;; Draw front right wheel
-  (SETQ
-    WHEELFRSTARTX
-     (+ (CAR STARTDRAWPOINT)
-        (- VEHFRONTHANG (/ WHEELLENGTH 2))
-     )
-  )
-  (SETQ
-    WHEELFRSTARTY
-     (+ (CADR STARTDRAWPOINT)
-        (- (/ VEHWHEELWIDTH 2) (/ WHEELWIDTH 2))
-     )
-  )
-  (DRAWBOX
-    (LIST WHEELFRSTARTX WHEELFRSTARTY)
-    WHEELLENGTH
-    WHEELWIDTH
-    "C-TURN-TRCK-BODY"
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;; Draw rear left wheel
-  (SETQ
-    WHEELRLSTARTX
-     (+ (CAR STARTDRAWPOINT)
-        (- VEHFRONTHANG (/ WHEELLENGTH 2))
-        VEHWHEELBASE
-     )
-  )
-  (SETQ
-    WHEELRLSTARTY
-     (- (CADR STARTDRAWPOINT)
-        (+ (/ VEHWHEELWIDTH 2) (/ WHEELWIDTH 2))
-     )
-  )
-  (DRAWBOX
-    (LIST WHEELRLSTARTX WHEELRLSTARTY)
-    WHEELLENGTH
-    WHEELWIDTH
-    "C-TURN-TRCK-BODY"
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;; Draw rear right wheel
-  (SETQ
-    WHEELRRSTARTX
-     (+ (CAR STARTDRAWPOINT)
-        (- VEHFRONTHANG (/ WHEELLENGTH 2))
-        VEHWHEELBASE
-     )
-  )
-  (SETQ
-    WHEELRRSTARTY
-     (+ (CADR STARTDRAWPOINT)
-        (- (/ VEHWHEELWIDTH 2) (/ WHEELWIDTH 2))
-     )
-  )
-  (DRAWBOX
-    (LIST WHEELRRSTARTX WHEELRRSTARTY)
-    WHEELLENGTH
-    WHEELWIDTH
-    "C-TURN-TRCK-BODY"
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  ;; End of main vehicle entry
-  ;; Start trailer entry
-  (INITGET 1 "Yes No")
-  (SETQ TRAILHAVE (GETKWORD "\nDoes unit have a trailer? [Yes/No]:  "))
-  (MAKEATTRIBUTE
-    (POLAR
-      STARTDRAWPOINT
-      0.0
-      (+ VEHFRONTHANG VEHWHEELBASE)     ;(* VEHREARHITCH 0.5)) Edited 2008-04-10 to accomodate prompt order change
-    )
-    90.0
-    "TRAILHAVE"
-    TRAILHAVE
-    "AttributeLayer"
-    "Does unit have a trailer"
-    (/ VEHWIDTH 15)
-  )
-  (SSADD (ENTLAST) VEHBLOCKLIST)
-  (COND
-    ((= TRAILHAVE "Yes")
-     ;;Moved hitch stuff 2008-04-10 by Tom Haws so non-trailer builds won't see it.
-     (SETQ
-       VEHREARHITCH
-        (GETDIST
-          "\nEnter distance from rear axle to hitch (forward is NEGATIVE):  "
-        )
-     )
-     ;;Draw hitch
-     (SETQ
-       CIRCLELIST
-        (LIST
-          (CONS 0 "CIRCLE")             ;(CONS 100 "AcDbEntity")
-          (CONS 8 "C-TURN-TRCK-BODY")   ;(CONS 100 "AcDbCircle")
-          (CONS 40 (/ VEHWIDTH 10))
-          (CONS
-            10
-            (POLAR
-              STARTDRAWPOINT
-              0.0
-              (+ VEHFRONTHANG VEHWHEELBASE VEHREARHITCH)
-            )
+               findings
+             )
           )
         )
-     )
-     (ENTMAKE CIRCLELIST)
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     (MAKEATTRIBUTE
-       (POLAR
-         STARTDRAWPOINT
-         0.0
-         (+ VEHFRONTHANG VEHWHEELBASE VEHREARHITCH)
-       )
-       90.0
-       "VEHREARHITCH"
-       (RTOS VEHREARHITCH 2)
-       "AttributeLayer"
-       "Vehicle rear hitch location (forward is NEGATIVE): "
-       (/ VEHWIDTH 15)
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Vehicle articulation angle not functional.  Prompt hidden by Tom Haws 2008-04-10.
-     (SETQ VEHARTANGLE 0.5)
-     ;|
-     (SETQ VEHARTANGLE
-     (GETANGLE "\nEnter vehicle articulation angle:  (note that this is required but not used at this time)")
-     )
-     |;
-     ;; Record wheel width
-     (MAKEATTRIBUTE
-       (POLAR
-         STARTDRAWPOINT
-         0.0
-         (+ VEHFRONTHANG VEHWHEELBASE (* VEHREARHITCH 1.5))
-       )
-       90.0
-       "VEHARTANGLE"
-       (ANGTOS VEHARTANGLE 0)
-       "AttributeLayer"
-       "Vehicle articulation angle"
-       (/ VEHWIDTH 15)
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     (SETQ TRAILNAME (GETSTRING "\nName for trailer:  "))
-     ;| Code not used at this time.  Prompt hidden and default set by Tom Haws 2008-04-10
-  ;;Input change 2008-04-10 Tom Haws
-  (initget 1 "M I")
-  (SETQ TRAILUNITS (GETKWORD "\nMetric or Imperial units [M/I]:  "))
-  |; (SETQ TRAILUNITS "M")
-     ;;Prompt change 2008-04-11 Tom Haws
-     (SETQ
-       TRAILERHITCHTOWHEEL
-        (GETDIST
-          "\nDistance from hitch to trailer axle:  "
-        )
-     )
-     ;;Prompt change 2008-04-11 Tom Haws
-     (SETQ
-       TRAILERWHEELWIDTH
-        (*
-          2
-          (GETDIST
-            "\nHalf of maximum trailer axle width to middle of wheels:  "
-          )
-        )
-     )
-     (SETQ
-       TRAILERFRONTHANG
-        (GETDIST
-          "\nDistance from hitch to front of trailer (forward is NEGATIVE):  "
-        )
-     )
-     (SETQ TRAILERBODYLENGTH (GETDIST "\nOverall trailer length:  "))
-     (SETQ TRAILERWIDTH (* 2 (GETDIST "\nHalf of trailer width:  ")))
-     ;; Record trailer Length
-     (MAKEATTRIBUTE
-       (POLAR
-         (POLAR STARTDRAWPOINT (* 1.5 PI) (* TRAILERWIDTH 0.55))
-         0.0
-         (+ VEHFRONTHANG
-            VEHWHEELBASE
-            VEHREARHITCH
-            (/ TRAILERBODYLENGTH 2)
-         )
-       )
-       0.0
-       "TRAILERBODYLENGTH"
-       (RTOS TRAILERBODYLENGTH 2)
-       "AttributeLayer"
-       "Trailer body length"
-       (/ VEHWIDTH 15)
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Record trailer name
-     (MAKEATTRIBUTE
-       (POLAR
-         STARTDRAWPOINT
-         0.0
-         (+ VEHFRONTHANG
-            VEHWHEELBASE
-            VEHREARHITCH
-            (/ TRAILERBODYLENGTH 2)
-         )
-       )
-       0.0
-       "TRAILNAME"
-       TRAILNAME
-       "AttributeLayer"
-       "Trailer name"
-       (/ VEHWIDTH 10)
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Record trailer units
-     (MAKEATTRIBUTE
-       (POLAR
-         (POLAR STARTDRAWPOINT (* 1.5 PI) (* TRAILERWIDTH 0.25))
-         0.0
-         (+ VEHFRONTHANG
-            VEHWHEELBASE
-            VEHREARHITCH
-            (/ TRAILERBODYLENGTH 2)
-         )
-       )
-       0.0
-       "TRAILUNITS"
-       TRAILUNITS
-       "AttributeLayer"
-       "Trailer units"
-       (/ VEHWIDTH 15)
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Record trailerfronthang
-     (MAKEATTRIBUTE
-       (POLAR
-         (POLAR STARTDRAWPOINT (* 1.5 PI) (* TRAILERWIDTH 0.55))
-         0.0
-         (+ VEHFRONTHANG
-            VEHWHEELBASE
-            (- VEHREARHITCH (/ TRAILERFRONTHANG 2))
-         )
-       )
-       0.0
-       "TRAILERFRONTHANG"
-       (RTOS TRAILERFRONTHANG 2)
-       "AttributeLayer"
-       "Trailer front overhang"
-       (/ VEHWIDTH 15)
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Record trailer to wheel length
-     (MAKEATTRIBUTE
-       (POLAR
-         (POLAR STARTDRAWPOINT (* 0.5 PI) (* TRAILERWIDTH 0.55))
-         0.0
-         (+ VEHFRONTHANG
-            VEHWHEELBASE
-            VEHREARHITCH
-            (/ TRAILERBODYLENGTH 2)
-         )
-       )
-       0.0
-       "TRAILERHITCHTOWHEEL"
-       (RTOS TRAILERHITCHTOWHEEL 2)
-       "AttributeLayer"
-       "Trailer hitch to wheel length"
-       (/ VEHWIDTH 15)
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Record trailer width
-     (MAKEATTRIBUTE
-       (POLAR
-         STARTDRAWPOINT
-         0.0
-         (+ VEHFRONTHANG
-            VEHWHEELBASE
-            VEHREARHITCH
-            (- TRAILERBODYLENGTH TRAILERFRONTHANG)
-         )
-       )
-       90.0
-       "TRAILERWIDTH"
-       (RTOS TRAILERWIDTH 2)
-       "AttributeLayer"
-       "Trailer width"
-       (/ VEHWIDTH 15)
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Record trailer wheel width
-     (MAKEATTRIBUTE
-       (POLAR
-         STARTDRAWPOINT
-         0.0
-         (+ VEHFRONTHANG
-            VEHWHEELBASE
-            VEHREARHITCH
-            TRAILERHITCHTOWHEEL
-         )
-       )
-       90.0
-       "TRAILERWHEELWIDTH"
-       (RTOS TRAILERWHEELWIDTH 2)
-       "AttributeLayer"
-       "Trailer axle width to middle of wheels"
-       (/ VEHWIDTH 15)
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Draw trailer
-     (DRAWBOX
-       (POLAR
-         (POLAR
-           STARTDRAWPOINT
-           0.0
-           (+ VEHFRONTHANG VEHWHEELBASE VEHREARHITCH TRAILERFRONTHANG)
-         )
-         (* 1.5 PI)
-         (/ TRAILERWIDTH 2)
-       )
-       TRAILERBODYLENGTH
-       TRAILERWIDTH
-       "C-TURN-TRAL-BODY"
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Draw rear left trailer tire
-     (SETQ
-       WHEELRLSTARTX
-        (- (+ (CAR STARTDRAWPOINT)
-              VEHFRONTHANG
-              VEHWHEELBASE
-              VEHREARHITCH
-              TRAILERHITCHTOWHEEL
-           )
-           (/ WHEELLENGTH 2)
-        )
-     )
-     (SETQ
-       WHEELRLSTARTY
-        (- (CADR STARTDRAWPOINT)
-           (+ (/ TRAILERWHEELWIDTH 2) (/ WHEELWIDTH 2))
-        )
-     )
-     (DRAWBOX
-       (LIST WHEELRLSTARTX WHEELRLSTARTY)
-       WHEELLENGTH
-       WHEELWIDTH
-       "C-TURN-TRAL-BODY"
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-     ;; Draw rear right trailer tire
-     (SETQ
-       WHEELRRSTARTX
-        (- (+ (CAR STARTDRAWPOINT)
-              VEHFRONTHANG
-              VEHWHEELBASE
-              VEHREARHITCH
-              TRAILERHITCHTOWHEEL
-           )
-           (/ WHEELLENGTH 2)
-        )
-     )
-     (SETQ
-       WHEELRRSTARTY
-        (+ (CADR STARTDRAWPOINT)
-           (- (/ TRAILERWHEELWIDTH 2) (/ WHEELWIDTH 2))
-        )
-     )
-     (DRAWBOX
-       (LIST WHEELRRSTARTX WHEELRRSTARTY)
-       WHEELLENGTH
-       WHEELWIDTH
-       "C-TURN-TRAL-BODY"
-     )
-     (SSADD (ENTLAST) VEHBLOCKLIST)
-    )
-  )
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-;;; ADD REQUEST HERE TO VERIFY DIMENSIONS AND LAYOUT,
-;;; DUMP OUT LIST OF VALUES, AND ALSO ZOOM TO HIGHLIGHT VEHICLE
-;;; <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-  ;;(makeblock VehBlockList StartDrawPoint (strcat "VEHICLELIB" VEHNAME))
-  ;;makes a block without accessible attributes, needs fix
-  ;;Expert setting added 2008-04-10 by Tom Haws
-  ;;to quick and dirty make block redefine without error
-  (SETQ OLDEXPERT (GETVAR "expert"))
-  (SETVAR "expert" 5)
-  (COMMAND
-    "-block"
-    (STRCAT "VEHICLELIB" VEHNAME)
-    STARTDRAWPOINT
-    VEHBLOCKLIST
-    ""
-  )
-  (COMMAND
-    "-insert"
-    (STRCAT "VEHICLELIB" VEHNAME)
-    STARTDRAWPOINT
-    ""
-    ""
-    ""
-  )
-  ;;Expert setting added 2008-04-10 by Tom Haws
-  ;;to quick and dirty make block redefine without error
-  (SETVAR "expert" OLDEXPERT)
-  ;;Prompt change 2008-04-10 Tom Haws
-  (ALERT
-    (PRINC
-      "\nVehicle block definitions complete.  Move vehicle block into initial position.\n\nPosition Front Left Tire on start of path, and rotate vehicle to approximate starting direction.\n\nThen enter TURN to track path."
-    )
-  )
-  (PRINC)
-)
-;;;==========================================
-;;; End Buildvehicle                        |
-;;;==========================================
-
-;;;Start buildvehicle subfunctions
-(DEFUN
-   DRAWTARGET (STARTPOINT XLENGTH YLENGTH TARGETLAYER /)
-  (SETQ
-    CIRCLELIST
-     (LIST
-       (CONS 0 "CIRCLE")                ;(CONS 100 "AcDbEntity")
-       (CONS 8 TARGETLAYER)             ;(CONS 100 "AcDbCircle")
-       (CONS 40 (/ YLENGTH 4.0))
-       (CONS 10 STARTPOINT)
-     )
-  )
-  (ENTMAKE CIRCLELIST)
-)
-;;;
-(DEFUN
-   DRAWBOX (STARTPOINT XLENGTH YLENGTH BOXLAYER /)
-  (SETQ BOXPOLYLIST NIL)
-  (SETQ
-    BOXPOLYLIST
-     (LIST
-       (CONS 43 0.0)
-       (CONS 70 1)
-       ;; closed pline if set
-       (CONS 90 4)
-       ;; polyline length
-       (CONS 100 "AcDbPolyline")
-       (CONS 8 BOXLAYER)
-       ;; layer name
-       (CONS 100 "AcDbEntity")
-       (CONS 0 "LWPOLYLINE")
-     )
-  )
-  (SETQ BOXPOLYLIST (CONS (CONS 10 STARTPOINT) BOXPOLYLIST))
-  (SETQ
-    BOXPOLYLIST
-     (CONS
-       (CONS 10 (POLAR STARTPOINT 0.0 XLENGTH))
-       BOXPOLYLIST
-     )
-  )
-  (SETQ
-    BOXPOLYLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           (POLAR STARTPOINT 0.0 XLENGTH)
-           (/ PI 2)
-           YLENGTH
-         )
-       )
-       BOXPOLYLIST
-     )
-  )
-  (SETQ
-    BOXPOLYLIST
-     (CONS
-       (CONS 10 (POLAR STARTPOINT (/ PI 2) YLENGTH))
-       BOXPOLYLIST
-     )
-  )
-  (SETQ BOXPOLYLIST (REVERSE BOXPOLYLIST))
-  ;; commented by Tom haws 2008-04-10  (princ "making boxpolylist")
-  (ENTMAKE BOXPOLYLIST)
-  ;; commented by Tom haws 2008-04-10   (princ entlast)
-)
-;;;
-;;;
-;;;
-(DEFUN
-   MAKEATTRIBUTE
-   (INSPOINT INSANGLE TAG VALUE ATTRIBLAYER ATTPROMPT TEXTSIZE)
-  (SETQ ATTRIBUTELIST NIL)
-  (SETQ
-    ATTRIBUTELIST
-     (LIST
-       (CONS 0 "ATTDEF")                ;(CONS 100 "AcDbEntity")
-                                        ;(CONS 100 "AcDbText")
-                                        ;(CONS 100 "AcDbAttributeDefinition")
-       (CONS 1 VALUE)
-       (CONS 2 TAG)
-       (CONS 3 ATTPROMPT)
-       (CONS 8 ATTRIBLAYER)
-       (CONS 10 INSPOINT)               ; not applicable insert point
-       (CONS 11 INSPOINT)               ; this is the real insert point
-       (CONS 40 TEXTSIZE)
-       (CONS 50 (* (/ INSANGLE 360) (* 2 PI)))
-       (CONS 70 8)
-       (CONS 72 4)
-     )
-  )
-  (ENTMAKE ATTRIBUTELIST)
-)
-;;;====================================================================
-;;;
-;;;
-;;;(defun makeblock (sset baspoint name / i e en blocktype)  ;;;  faster and neater than command -block, but needs fix
-;;;(if (not sset) (setq sset (ssadd)))
-;;;(if (or (/= 'STR (type name)) (= "" name)) (setq name "*A"))
-;;;(if (= (substr name 1 1) "*")
-;;;        (setq blocktype 1 name "*A")
-;;;        (setq blocktype 0)
-;;;)
-;;;  (setq blocktype 2)  ;; added by srh
-;;;(entmake (append
-;;;        '((0 . "BLOCK"))
-;;;        (list (cons 2  name))
-;;;        (list (cons 70 blocktype))
-;;;        (list (cons 10 baspoint))
-;;;))
-;;;(setq i -1)
-;;;(while (setq e (ssname sset (setq i (1+ i))))
-;;;        (cond
-;;;                ((/= 1 (cdr (assoc 66 (entget e))))
-;;;                        (if (entget e) (progn
-;;;                                (entmake (entget e '("*")))
-;;;                                (entdel e)
-;;;                        ))
-;;;                )
-;;;                ((= 1 (cdr (assoc 66 (entget e))))
-;;;                        (if (entget e) (progn
-;;;                                (entmake (entget e '("*")))
-;;;                                (setq en e)
-;;;                                (while (/= "SEQEND" (cdr (assoc 0 (entget en))))
-;;;                                        (setq en (entnext en))
-;;;                                        (entmake (entget en '("*")))
-;;;                                )
-;;;                                (entdel e)
-;;;                        ))
-;;;                )
-;;;        )
-;;;)
-;;;(setq name (entmake '((0 . "ENDBLK"))))
-;;;(if name (progn
-;;;        (entmake (append
-;;;                '((0 . "INSERT"))
-;;;                (list (cons 2 name))
-;;;                (list (cons 10 baspoint))
-;;;        ))
-;;;
-;;;))
-;;;(if name (entlast) nil)
-;;;)
-;;;
-;;;(defun c:makeblock ()
-;;;(makeblock (ssget) (getpoint "\nInsertionpoint: ") (getstring "\nName:
-;;;"))
-;;;)
-
-
-(DEFUN
-   TURN-MAIN-GENERATED-BLOCK-METHOD (/ ANGTRV DIRREAR1 DIRREAR2 DIRVEH1
-                                     DIRVEH2 DSTTRV EMARK ENI ES1 I LVEH
-                                     OSMOLD PFRONT1 PFRONT2 PREAR1
-                                     PREAR2 TRACKLOCATION
-                                     VEHICLEDATALIST
-                                    )
-  (SETVEHICLEDIMS)
-  (SETQ
-    ES1
-     (ENTSEL "\nSelect starting end of polyline to track:")
-     ;;TRACKLOCATION ("L")
-     ;;(initget 1 "L M R")
-     ;;(setq TRACKLOCATION (getkword "Is this track on the L eft, M iddle, or R ight of the front axle? (L or M or R) ")) 
-  )
-  (SETQ
-    PFRONT1
-     (OSNAP (CADR ES1) "endp")
-    LVEH VEHWHEELBASE
-    ;;(distance pfront1 prear1) ;This was the TURN.LSP method of getting wheelbase length
-    DIRVEH1
-     (CDR (ASSOC 50 (ENTGET VEHENTNAME)))
-    ;;(ANGLE PFRONT1 PREAR1)  ;This was the TURN.LSP method of getting initial angle
-    DIRTRAILER
-     DIRVEH1
-    DIRREAR1 DIRVEH1
-    ;; Define step distance as 1/10 length of wheelbase
-    ;;Edited 2008-04-10 by Tom Haws
-    *TURN-CALCULATIONSTEP*
-     (GETDISTX
-       PFRONT1
-       "\nCalculation step distance along front wheel path"
-       *TURN-CALCULATIONSTEP*
-       (/ LVEH 10.0)
-     )
-    ;; Plot frequency added 2008-04-10 by Tom Haws
-    ;; Define plot frequency as every 50 steps
-    *TURN-PLOTFREQUENCY*
-     (GETINTX
-       "\nNumber of calculation steps to skip between vehicle plots"
-       *TURN-PLOTFREQUENCY*
-       50
-     )
-    SS1
-     (SSADD)
-    OSMOLD
-     (GETVAR "osmode")
-  )
-  (SETQ
-    PREAR1
-     (POLAR PFRONT1 DIRVEH1 LVEH)
-    PPLT1 PREAR1
-  )
-  (SETVAR "osmode" 0)
-  ;; Draw a point at first point of line
-  (COMMAND "._point" PFRONT1)
-  ;; Add point to selection set
-  (SETQ
-    ENI (ENTLAST)
-    SS1 (SSADD ENI SS1)
-  )
-  ;; Divide pline up by step distance
-  (COMMAND "._measure" ES1 *TURN-CALCULATIONSTEP*)
-  ;; Build selection set of all points generated following first point
-  (WHILE (SETQ ENI (ENTNEXT ENI)) (SETQ SS1 (SSADD ENI SS1)))
-  (SETQ I (1- (SSLENGTH SS1)))
-  ;; 20020625 Revision.  See header.
-  ;;Reverse the selection set if the pline is backwards
-  ;;(if picked point is closer to last MEASURE command point than first)
-  (IF (< (DISTANCE
-           (TRANS
-             ;; the coordinates of the point to translate
-             (CDR (ASSOC 10 (ENTGET (SSNAME SS1 I))))
-             ;; from pline coordinate system
-             (SSNAME SS1 I)
-             ;; to user coordinate system
-             1
-           )
-           ;; the picked point, which is in the user coordinate system
-           PFRONT1
-         )
-         (DISTANCE
-           (TRANS
-             ;; the coordinates of the point to translate
-             (CDR (ASSOC 10 (ENTGET (SSNAME SS1 1))))
-             ;; from pline coordinate system
-             (SSNAME SS1 1)
-             ;; to user coordinate system
-             1
-           )
-           ;; the picked point, which is in the user coordinate system
-           PFRONT1
-         )
       )
-    (WHILE (< 0 (SETQ I (1- I)))
-      (SETQ ENI (SSNAME SS1 I))
-      (SSDEL ENI SS1)
-      (SSADD ENI SS1)
     )
-  )
-  ;;  End 20020625 Revision
-  ;;  Initial Travel Angle from Pick Points
-  (SETQ DIRVEHDRAW (ANGLE PREAR1 PFRONT1))
-  (SETQ PATHSEGMENTS (1- (SSLENGTH SS1)))
-  (DRAWBODY)
-  (SETQ I 0)
-  ;;_______Initiate Rear Left Path
-  (SETQ
-    REARLEFTTIREPATHLIST
-     (LIST
-       (CONS 43 0.0)
-       (CONS 70 128)
-;;; plinegen added 2008-04-10 by Tom Haws
-       (CONS 90 PATHSEGMENTS)
-       ;; polyline length
-       (CONS 100 "AcDbPolyline")
-       (CONS
-         8
-         (CAR
-           (TURN-GETLAYER "TruckBackLeftTirePath")
-         )
-       )
-       (CONS 100 "AcDbEntity")
-       (CONS 0 "LWPOLYLINE")
-     )
-  )
-  (SETQ
-    REARLEFTTIREPATHLIST
-     (CONS (CONS 10 PREAR1) REARLEFTTIREPATHLIST)
-  )
-  ;;_______Complete Initiate Rear Left Path
-  ;;
-  ;;_______Initiate Front Right Path
-  (SETQ
-    FRONTRIGHTTIREPATHLIST
-     (LIST
-       (CONS 43 0.0)
-       (CONS 70 128)
-;;; plinegen added 2008-04-10 by Tom Haws
-       (CONS 90 PATHSEGMENTS)
-       ;; polyline length
-       (CONS 100 "AcDbPolyline")
-       (CONS
-         8
-         (CAR
-           (TURN-GETLAYER
-             "TruckFrontRightTirePath"
-           )
-         )
-       )
-       (CONS 100 "AcDbEntity")
-       (CONS 0 "LWPOLYLINE")
-     )
-  )
-  (SETQ
-    FRONTRIGHTTIREPATHLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PFRONT1
-           (+ DIRVEH1 (/ PI 2))
-           VEHWHEELWIDTH
-         )
-       )
-       ;;prear1)
-       FRONTRIGHTTIREPATHLIST
-     )
-  )
-  ;;_______Complete Initiate Front Right Path
-  ;;
-  ;;_______Initiate Rear Right Path
-  (SETQ
-    REARRIGHTTIREPATHLIST
-     (LIST
-       (CONS 43 0.0)
-       (CONS 70 128)
-;;; plinegen added 2008-04-10 by Tom Haws
-       (CONS 90 PATHSEGMENTS)
-       ;; polyline length
-       (CONS 100 "AcDbPolyline")
-       (CONS
-         8
-         (CAR
-           (TURN-GETLAYER "TruckBackRightTirePath")
-         )
-       )
-       (CONS 100 "AcDbEntity")
-       (CONS 0 "LWPOLYLINE")
-     )
-  )
-  (SETQ
-    REARRIGHTTIREPATHLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PREAR1
-           (+ DIRVEH1 (/ PI 2))
-           VEHWHEELWIDTH
-         )
-       )
-       REARRIGHTTIREPATHLIST
-     )
-  )
-  ;;_______Complete Initiate Rear Right Path
-  ;;
-  ;;_______Initate Hitch Path
-  (COND
-    ((= TRAILHAVE "Yes")
-     (SETQ
-       HITCHPATHLIST
-        (LIST
-          (CONS 43 0.0)
-          (CONS 70 128)
-;;; plinegen added 2008-04-10 by Tom Haws
-          (CONS 90 PATHSEGMENTS)
-          ;; polyline length
-          (CONS 100 "AcDbPolyline")
-          (CONS 8 (CAR (TURN-GETLAYER "HitchPath")))
-          (CONS 100 "AcDbEntity")
-          (CONS 0 "LWPOLYLINE")
+    ;; Articulation at this segment's hitch.
+    (if (and (wiki-turn-seg-get segment "hitch") (nth (1+ index) paths))
+      (progn
+        (setq
+          art (wiki-turn-articulation states (nth (1+ index) paths))
+          art-limit (wiki-turn-seg-get segment "art-angle")
+          max-art 0.0
         )
-     )
-     (SETQ
-       HITCHPATHLIST
-        (CONS
-          (CONS
-            10
-            (POLAR
-              PFRONT1
-              (- DIRVEH1 REARHITCHANG)
-              REARHITCHDIST
-            )
+        (foreach a art (if (> (abs a) max-art) (setq max-art (abs a))))
+        (if (and art-limit (< 0 art-limit) (> max-art art-limit))
+          (setq
+            findings
+             (cons
+               (strcat
+                 "Jackknife: articulation behind " (wiki-turn-seg-get segment "name")
+                 " reaches " (angtos max-art 0 1)
+                 ", limit is " (angtos art-limit 0 1) "."
+               )
+               findings
+             )
           )
-          HITCHPATHLIST
         )
+      )
+    )
+    (setq index (1+ index))
+  )
+  (reverse findings)
+)
+
+;;; ===========================================================================
+;;; SECTION 5  VEHICLE BLOCK <-> VEHICLE
+;;; ===========================================================================
+;;; Reads the attributed block BUILDVEHICLE writes. The tag names of 1.1.x are
+;;; preserved exactly, so every vehicle block ever built still loads. Trailers
+;;; beyond the first use the same tags with an index inserted.
+
+;; Attribute tag for one segment property.
+;; index 0 = powered unit, 1 = first trailer (legacy tags), 2+ = new tags.
+(defun wiki-turn-tag (index key / prefix)
+  (cond
+    ((zerop index)
+     (cdr
+       (assoc key
+         '(("name" . "VEHNAME") ("wheelbase" . "VEHWHEELBASE") ("axle-width" . "VEHWHEELWIDTH")
+           ("body-length" . "VEHBODYLENGTH") ("body-width" . "VEHWIDTH")
+           ("front-hang" . "VEHFRONTHANG") ("hitch" . "VEHREARHITCH")
+           ("steer-lock" . "VEHSTEERLOCK") ("art-angle" . "VEHARTANGLE")
+          )
+       )
+     )
+    )
+    (t
+     (setq prefix (if (= index 1) "TRAILER" (strcat "TRAILER" (itoa index))))
+     (cond
+       ;; The first trailer's name tag is TRAILNAME, not TRAILERNAME. Legacy.
+       ((and (= key "name") (= index 1)) "TRAILNAME")
+       ((= key "name") (strcat prefix "NAME"))
+       ((= key "wheelbase") (strcat prefix "HITCHTOWHEEL"))
+       ((= key "axle-width") (strcat prefix "WHEELWIDTH"))
+       ((= key "body-length") (strcat prefix "BODYLENGTH"))
+       ((= key "body-width") (strcat prefix "WIDTH"))
+       ((= key "front-hang") (strcat prefix "FRONTHANG"))
+       ((= key "hitch") (strcat prefix "REARHITCH"))
+       ((= key "art-angle") (strcat prefix "ARTANGLE"))
      )
     )
   )
-  ;;_______Complete Initiate Hitch Path
-  ;; Calculate rear path.
-  ;; For every point on front wheel path,
-  ;; calculate a point on rear wheel path
-  (WHILE (SETQ ENI (SSNAME SS1 (SETQ I (1+ I))))
-    (PROGN
-      (SETQ
-        ;; set second point to the location of eni in the current UCS
-        PFRONT2
-         (TRANS (CDR (ASSOC 10 (ENTGET ENI))) ENI 1)
-        ;; angle of travel this step
-        DIRTRV
-         (ANGLE PFRONT1 PFRONT2)
-        ;; angle between angle of travel and angle of vehicle
-        ALPHA
-         (- DIRVEH1 DIRTRV)
-        ;;Distance front wheels traveled this step
-        DSTTRV
-         (DISTANCE PFRONT1 PFRONT2)
-        ;;Angle vehicle turned this step
-        ANGTRN
-         (* 2
-            (ATAN
-              (/ (SIN ALPHA) (- (/ (* 2 LVEH) DSTTRV) (COS ALPHA)))
-            )
+)
+
+;; Tag that says whether segment `index` tows anything.
+(defun wiki-turn-have-tag (index)
+  (if (zerop index) "TRAILHAVE" (strcat "TRAILER" (itoa (1+ index)) "HAVE"))
+)
+
+;; All attributes of a block insert, as ("TAG" . "value").
+(defun wiki-turn-block-attributes (en / el et out)
+  (while (and
+           (setq en (entnext en))
+           (setq el (entget en))
+           (setq et (cdr (assoc 0 el)))
+           (/= et "SEQEND")
          )
-        ;;Direction of vehicle at end of this step
-        DIRVEH2
-         (+ DIRVEH1 ANGTRN)
-        ;;Location of rear wheel at end of this step
-        PREAR2
-         (POLAR PFRONT2 DIRVEH2 LVEH)
-        ;;Direction the rear wheel traveled this step
-        DIRREAR2
-         (ANGLE PPLT1 PREAR2)
-        ;;Save this step's variables
-        PFRONT1
-         PFRONT2
-        PREAR1 PREAR2
-        DIRVEH1 DIRVEH2
-        DIRREAR1 DIRREAR2
-        PPLT1
-         PREAR2
-         ;;End saving
+    (if (= et "ATTRIB")
+      (setq out (cons (cons (strcase (cdr (assoc 2 el))) (cdr (assoc 1 el))) out))
+    )
+  )
+  (reverse out)
+)
+
+(defun wiki-turn-att-real (atts tag default / v)
+  (if (and tag (setq v (cdr (assoc tag atts))) (setq v (distof v)))
+    v
+    default
+  )
+)
+
+(defun wiki-turn-att-angle (atts tag default / v)
+  (if (and tag (setq v (cdr (assoc tag atts))))
+    (cond ((distof v) (* pi (/ (distof v) 180.0))) (t default))
+    default
+  )
+)
+
+;; Build one segment from a block's attributes.
+;; front-hang sign: on the powered unit VEHFRONTHANG runs FORWARD from the
+;; guide axle to the bumper. On a trailer TRAILERFRONTHANG runs BACKWARD from
+;; the hitch eye ("forward is NEGATIVE" in the old prompt). The model keeps a
+;; single convention - forward positive - so trailer values are negated here.
+(defun wiki-turn-segment-from-attributes (atts index / front-hang hitch)
+  (setq
+    front-hang (wiki-turn-att-real atts (wiki-turn-tag index "front-hang") 0.0)
+    front-hang (if (zerop index) front-hang (- front-hang))
+    hitch
+     (if (= "YES" (strcase (cond ((cdr (assoc (wiki-turn-have-tag index) atts))) ("No"))))
+       (wiki-turn-att-real atts (wiki-turn-tag index "hitch") 0.0)
+       nil
+     )
+  )
+  (wiki-turn-segment
+    (cond ((cdr (assoc (wiki-turn-tag index "name") atts))) ((strcat "Segment" (itoa index))))
+    (wiki-turn-att-real atts (wiki-turn-tag index "wheelbase") 0.0)
+    (wiki-turn-att-real atts (wiki-turn-tag index "axle-width") 0.0)
+    (wiki-turn-att-real atts (wiki-turn-tag index "body-length") 0.0)
+    (wiki-turn-att-real atts (wiki-turn-tag index "body-width") 0.0)
+    front-hang
+    hitch
+    (wiki-turn-att-angle atts (wiki-turn-tag index "steer-lock") 0.0)
+    (wiki-turn-att-angle atts (wiki-turn-tag index "art-angle") 0.0)
+  )
+)
+
+;; The whole vehicle. Walks the chain until a segment tows nothing.
+(defun wiki-turn-vehicle-from-attributes (atts / index segment vehicle)
+  (setq index 0)
+  (while
+    (progn
+      (setq
+        segment (wiki-turn-segment-from-attributes atts index)
+        vehicle (cons segment vehicle)
+        index (1+ index)
       )
-;;;  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  Developmental Code, not ready for prime time, leave commented please
-      ;; Indicate wheel turn angle on drawing
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;(entmake ())
-;;;      (princ "\n  start>>>>>>")
-;;;    (princ (nth 0 PFRONT2))
-;;;    (princ "\n  middle>>>>>>")
-;;;    (princ (nth 1 PFRONT2))
-;;;        (SETQ
-;;;   ANGLETEXTLIST
-;;;    (LIST
-;;;      (CONS 0 "TEXT")  ; TEXT ENTITY
-;;;     ;(CONS 100 "AcDbEntity")
-;;;      (CONS 8 (car (turn-getlayer "TruckBody"))) ; TEXT LAYER
-;;;     ;(CONS 100 "AcDbCircle")
+      (and (wiki-turn-seg-get segment "hitch") (< index 12))
+    )
+  )
+  (reverse vehicle)
+)
+
+;;; ===========================================================================
+;;; SECTION 5b  BUILDING A COURSE FROM A DRAWN OBJECT
+;;; ===========================================================================
+;;; 1.1.x built the course by running MEASURE on the polyline, harvesting the
+;;; POINT entities it left behind, guessing the travel direction by comparing
+;;; distances, and then erasing the points. That approach cost us three
+;;; separate defects:
 ;;;
-;;;      (CONS
-;;;        10
-;;;        (nth 0 PFRONT2)
-;;;      )
-;;;      (CONS
-;;;        20
-;;;        (nth 1 PFRONT2)
-;;;      )
-;;;      (CONS 40 (/ VEHWIDTH 10)) ;TEXT HEIGHT
-;;;      (CONS 1 (ANGTOS ANGTRN 0))
-;;;      (CONS 50 (RTOS DIRTRV 2))
-;;;    )
-;;; )
-;;; (ENTMAKE ANGLETEXTLIST)
-;;;      (princ "\n  end")
-                                        ;(SSADD (ENTLAST) VEHBLOCKLIST)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  End of Developmental Code
-      ;;Insert block at 180 from direction of travel
+;;;   - It called (osnap pick "_end") to find the start of the path, so whether
+;;;     TURN worked at all depended on the zoom level and APERTURE at the
+;;;     instant of the pick.
+;;;   - The vehicle block sits exactly on the start of the path, which is
+;;;     precisely where the user is told to pick, so the pick often grabbed the
+;;;     block instead. MEASURE then failed with "Cannot measure that object"
+;;;     and TURN carried on and drew nothing useful.
+;;;   - It littered and erased dozens of POINT entities per run.
+;;;
+;;; vlax-curve-* asks the object itself. It works on lines, arcs, polylines,
+;;; splines and Civil 3D alignments alike, needs no screen picking accuracy,
+;;; and leaves nothing behind.
+
+(defun wiki-turn-curve-p (en)
+  (and en (vl-catch-all-apply 'vlax-curve-getEndParam (list en))
+       (not (vl-catch-all-error-p (vl-catch-all-apply 'vlax-curve-getEndParam (list en))))
+  )
+)
+
+;; Sample a curve into a course of points, `step` apart, travelling away from
+;; whichever end the user picked nearest.
+(defun wiki-turn-course-from-curve (en pick step / dist far len out reverse-p)
+  (setq
+    len (vlax-curve-getDistAtParam en (vlax-curve-getEndParam en))
+    reverse-p
+     (> (vlax-curve-getDistAtPoint en (vlax-curve-getClosestPointTo en pick)) (/ len 2))
+    dist 0.0
+  )
+  (while (< dist len)
+    (setq
+      out (cons (trans (vlax-curve-getPointAtDist en (if reverse-p (- len dist) dist)) 0 1) out)
+      dist (+ dist step)
     )
-    (SETQ DIRVEHDRAW (+ PI DIRVEH2))
-    ;;Logic change 2008-04-10 Tom Haws
-    (IF (= (REM I *TURN-PLOTFREQUENCY*) 0)
-      (DRAWBODY)
-    )
-    (SETQ
-      REARLEFTTIREPATHLIST
-       (CONS (CONS 10 PREAR2) REARLEFTTIREPATHLIST)
-    )
-    (SETQ
-      FRONTRIGHTTIREPATHLIST
-       (CONS
-         (CONS
-           10
-           (POLAR
-             PFRONT1
-             (+ DIRVEH2 (/ PI 2))
-             VEHWHEELWIDTH
-           )
-         )
-         FRONTRIGHTTIREPATHLIST
-       )
-    )
-    (SETQ
-      REARRIGHTTIREPATHLIST
-       (CONS
-         (CONS
-           10
-           (POLAR
-             PREAR2
-             (+ DIRVEH2 (/ PI 2))
-             VEHWHEELWIDTH
-           )
-         )
-         REARRIGHTTIREPATHLIST
-       )
-    )
-    (COND
-      ((= TRAILHAVE "Yes")
-       (SETQ
-         HITCHPATHLIST
-          (CONS
-            (CONS
-              10
-              (POLAR
-                PFRONT2
-                (- DIRVEH2 REARHITCHANG)
-                REARHITCHDIST
+  )
+  ;; The last sample rarely lands exactly on the far end. Add it.
+  (setq far (trans (vlax-curve-getPointAtDist en (if reverse-p 0.0 len)) 0 1))
+  (if (> (distance far (car out)) (/ step 100.0))
+    (setq out (cons far out))
+  )
+  (reverse out)
+)
+
+;;; ===========================================================================
+;;; SECTION 5c  THE VEHICLE LIBRARY
+;;; ===========================================================================
+;;; Vehicles are data, not code and not drawings.
+;;;
+;;; 1.1.x had exactly one way to get a vehicle: run BUILDVEHICLE and answer
+;;; twenty prompts, or be sent a DWG containing somebody else's block. Neither
+;;; can be diffed, reviewed, or contributed to by e-mail. A plain text file can.
+;;;
+;;; turn-vehicles.dat is found with (findfile), so it can live anywhere on the
+;;; support path. It is optional: with no library present TURN still works, you
+;;; just build vehicles by hand.
+;;;
+;;; Format is the flagship's Layers.dat idiom - one parenthesised record per
+;;; line, leading token names the record type, semicolon comments:
+;;;
+;;;   ("VEHICLE" "KEY" "Description" "UNITS")
+;;;   ("SEGMENT" "Name" wheelbase axle-width body-length body-width
+;;;              front-hang hitch steer-lock art-angle)
+;;;
+;;; SEGMENT records attach to the VEHICLE record above them, powered unit
+;;; first. hitch is nil on the last segment. Angles are in DEGREES, because a
+;;; person editing this file thinks in degrees. front-hang is forward-positive
+;;; from the guide point, so it is negative on a trailer whose body starts
+;;; behind the hitch eye.
+
+(setq
+  *wiki-turn-library* nil
+  ;; Set this to read a specific file instead of searching the support
+  ;; path. Tests use it; leave it nil in normal use.
+  *wiki-turn-vehicles-file* nil
+)
+
+(defun wiki-turn-library-record-to-segment (rec)
+  (wiki-turn-segment
+    (nth 1 rec)
+    (float (nth 2 rec))
+    (float (nth 3 rec))
+    (float (nth 4 rec))
+    (float (nth 5 rec))
+    (float (nth 6 rec))
+    (if (nth 7 rec) (float (nth 7 rec)))
+    (* pi (/ (float (nth 8 rec)) 180.0))
+    (* pi (/ (float (nth 9 rec)) 180.0))
+  )
+)
+
+;; Read turn-vehicles.dat into *wiki-turn-library*, a list of
+;; ("KEY" "Description" "UNITS" vehicle).
+(defun wiki-turn-read-vehicles-dat (/ desc f key line lst path rec segs units)
+  ;; findfile on an absolute path returns it only if it exists, so a bad
+  ;; explicit path falls through to nil instead of handing (open) a name that
+  ;; is not there.
+  ;;
+  ;; NOTE: this must be (if ...), not (and ...). AutoLISP -and- returns T, not
+  ;; its last value, so (and file (findfile file)) yields T and (open T) fails
+  ;; with -bad argument type: stringp T-. Common Lisp habits do not transfer.
+  ;; Naming a file explicitly means THAT file or nothing. Falling back to a
+  ;; different library when the named one is absent would silently give you
+  ;; somebody else vehicles.
+  (if (setq path
+        (if *wiki-turn-vehicles-file*
+          (findfile *wiki-turn-vehicles-file*)
+          (findfile "turn-vehicles.dat")
+        )
+      )
+    (progn
+      (setq f (open path "r"))
+      (while (setq line (read-line f))
+        (setq line (vl-string-trim " \t" line))
+        (if (and (< 0 (strlen line)) (= "(" (substr line 1 1)))
+          (progn
+            (setq rec (read line))
+            (cond
+              ((= "VEHICLE" (strcase (car rec)))
+               ;; A new VEHICLE line closes the one before it.
+               (if key (setq lst (cons (list key desc units (reverse segs)) lst)))
+               (setq
+                 key (nth 1 rec)
+                 desc (nth 2 rec)
+                 units (nth 3 rec)
+                 segs nil
+               )
+              )
+              ((and (= "SEGMENT" (strcase (car rec))) key)
+               (setq segs (cons (wiki-turn-library-record-to-segment rec) segs))
               )
             )
-            HITCHPATHLIST
           )
+        )
+      )
+      (close f)
+      (if key (setq lst (cons (list key desc units (reverse segs)) lst)))
+      (setq *wiki-turn-library* (reverse lst))
+    )
+  )
+  *wiki-turn-library*
+)
+
+(defun wiki-turn-library-keys ()
+  (mapcar 'car (wiki-turn-read-vehicles-dat))
+)
+
+(defun wiki-turn-library-entry (key / hit)
+  (foreach e (wiki-turn-read-vehicles-dat)
+    (if (= (strcase key) (strcase (car e))) (setq hit e))
+  )
+  hit
+)
+
+(defun wiki-turn-library-vehicle (key / e)
+  (if (setq e (wiki-turn-library-entry key)) (cadddr e))
+)
+
+(defun wiki-turn-library-description (key / e)
+  (if (setq e (wiki-turn-library-entry key)) (cadr e))
+)
+
+(defun wiki-turn-library-units (key / e)
+  (if (setq e (wiki-turn-library-entry key)) (caddr e))
+)
+
+;; Scale a vehicle by a constant. Library vehicles are stored in the units the
+;; standard publishes them in; a drawing in other units needs them converted.
+(defun wiki-turn-scale-segment (segment factor)
+  (wiki-turn-segment
+    (wiki-turn-seg-get segment "name")
+    (* factor (wiki-turn-seg-get segment "wheelbase"))
+    (* factor (wiki-turn-seg-get segment "axle-width"))
+    (* factor (wiki-turn-seg-get segment "body-length"))
+    (* factor (wiki-turn-seg-get segment "body-width"))
+    (* factor (wiki-turn-seg-get segment "front-hang"))
+    (if (wiki-turn-seg-get segment "hitch")
+      (* factor (wiki-turn-seg-get segment "hitch"))
+    )
+    (wiki-turn-seg-get segment "steer-lock")
+    (wiki-turn-seg-get segment "art-angle")
+  )
+)
+
+(defun wiki-turn-scale-vehicle (vehicle factor)
+  (mapcar '(lambda (s) (wiki-turn-scale-segment s factor)) vehicle)
+)
+
+;; Length of one drawing unit, expressed in metres, from INSUNITS.
+;; Returns nil when INSUNITS is 0, which means the drawing declines to say.
+;; INSUNITS is the drawing's own declaration of its units and TURN follows it.
+;; It is not TURN's place to second-guess an AutoCAD setting: AutoCAD has
+;; settings for this and we honour them. What TURN does owe the user is to say
+;; out loud what it read and what it is therefore doing - see
+;; wiki-turn-report-units - so a drawing that is set up wrong shows itself as a
+;; number at the command line rather than as a vehicle the wrong size.
+(defun wiki-turn-drawing-unit-metres (/ code)
+  (setq code (getvar "insunits"))
+  (cdr
+    (assoc
+      code
+      '((1 . 0.0254) (2 . 0.3048) (3 . 1609.344) (4 . 0.001) (5 . 0.01)
+        (6 . 1.0) (7 . 1000.0) (8 . 0.0000254) (9 . 0.0000000254)
+        (10 . 0.9144) (11 . 0.0000000001) (12 . 0.000000001)
+        (13 . 0.000001) (14 . 0.1) (15 . 10.0) (16 . 100.0)
        )
+    )
+  )
+)
+
+(defun wiki-turn-units-metres (units / u)
+  (setq u (strcase units))
+  (cond
+    ((member u '("FT" "FEET" "F" "I" "IMPERIAL")) 0.3048)
+    ((member u '("IN" "INCH" "INCHES")) 0.0254)
+    ((member u '("M" "METRE" "METER" "METRES" "METERS" "METRIC")) 1.0)
+    ((member u '("MM" "MILLIMETRE" "MILLIMETER")) 0.001)
+    ((member u '("CM")) 0.01)
+  )
+)
+
+;; The factor that turns library units into drawing units. 1.0, plus a warning,
+;; when the drawing has not declared its units.
+(defun wiki-turn-library-scale (units / drawing library)
+  (setq
+    library (wiki-turn-units-metres units)
+    drawing (wiki-turn-drawing-unit-metres)
+  )
+  (cond
+    ((not library)
+     (wiki-turn-alert
+       (strcat "The library says this vehicle is in \"" units "\", which TURN does not"
+               "\nrecognise. Using its dimensions unscaled.")
+     )
+     1.0
+    )
+    ((not drawing)
+     (princ
+       (strcat "\nTURN: this drawing does not declare its units (INSUNITS is 0), so the"
+               "\n      vehicle is being used unscaled, as " units ".")
+     )
+     1.0
+    )
+    (t (/ library drawing))
+  )
+)
+
+;; A library vehicle, scaled into this drawing's units.
+(defun wiki-turn-library-vehicle-scaled (key / units vehicle)
+  (if (setq vehicle (wiki-turn-library-vehicle key))
+    (progn
+      (setq units (wiki-turn-library-units key))
+      (wiki-turn-scale-vehicle vehicle (wiki-turn-library-scale units))
+    )
+  )
+)
+
+;;; ===========================================================================
+;;; SECTION 6  DRAWING THE RESULTS
+;;; ===========================================================================
+
+(defun wiki-turn-draw-pline (points layer closed / lst)
+  (setq
+    lst
+     (list
+       (cons 0 "LWPOLYLINE")
+       (cons 100 "AcDbEntity")
+       (cons 8 layer)
+       (cons 100 "AcDbPolyline")
+       (cons 90 (length points))
+       (cons 70 (if closed 1 128))
+       (cons 43 0.0)
+     )
+  )
+  (foreach p points (setq lst (append lst (list (cons 10 p)))))
+  (entmake lst)
+)
+
+;; Everything one segment contributes to the drawing.
+(defun wiki-turn-draw-segment (segment states index plot-frequency / corner i loci)
+  (setq loci (wiki-turn-tire-loci segment states))
+  (wiki-turn-draw-pline (nth 0 loci) (wiki-turn-layer index "FRNT-LEFT") nil)
+  (wiki-turn-draw-pline (nth 1 loci) (wiki-turn-layer index "FRNT-RGHT") nil)
+  (wiki-turn-draw-pline (nth 2 loci) (wiki-turn-layer index "REAR-LEFT") nil)
+  (wiki-turn-draw-pline (nth 3 loci) (wiki-turn-layer index "REAR-RGHT") nil)
+  (if (wiki-turn-seg-get segment "hitch")
+    (wiki-turn-draw-pline
+      (wiki-turn-hitch-course (wiki-turn-seg-get segment "hitch") states)
+      (wiki-turn-layer index "HTCH")
+      nil
+    )
+  )
+  ;; The locus of each body corner. These are the four curves that generate
+  ;; the envelope; drawn on their own so you can see which corner governs.
+  (if (= "Yes" (wiki-turn-getvar "general.drawcorners"))
+    (progn
+      (setq corner -1)
+      (repeat 4
+        (setq corner (1+ corner))
+        (wiki-turn-draw-pline
+          (wiki-turn-corner-locus segment states corner)
+          (wiki-turn-layer index "CRNR")
+          nil
+        )
       )
     )
   )
-  (SETQ REARLEFTTIREPATHLIST (REVERSE REARLEFTTIREPATHLIST))
-  (ENTMAKE REARLEFTTIREPATHLIST)
-  (SETQ FRONTRIGHTTIREPATHLIST (REVERSE FRONTRIGHTTIREPATHLIST))
-  (ENTMAKE FRONTRIGHTTIREPATHLIST)
-  (SETQ REARRIGHTTIREPATHLIST (REVERSE REARRIGHTTIREPATHLIST))
-  (ENTMAKE REARRIGHTTIREPATHLIST)
-  (SETQ HITCHPATHLIST (REVERSE HITCHPATHLIST))
-  (ENTMAKE HITCHPATHLIST)
-  (SETQ HITCHPATH (ENTLAST))
-  (IF (= TRAILHAVE "Yes")
-    (TRAILERPATH)
-    (PRINC "\nTrailer not Included, no trailer calculated.")
-  )
-  (SETVAR "osmode" OSMOLD)
-  (COMMAND "._erase" SS1 "")
-  (REDRAW)
-  (PRINC)
-)
-;;; CREATE_VAR
-(DEFUN
-   CREATE_VAR (PREFIX SUFFIX STRNG /)
-  (SET (READ (STRCAT PREFIX SUFFIX)) STRNG)
-  (READ (STRCAT PREFIX SUFFIX))
-)
-;;; SETVEHICLEDIMS
-(DEFUN
-   SETVEHICLEDIMS ()
-  (SETQ VEHICLEDATALIST (VEHICLEDATAGET))
-  (SETQ VEHICLEDATALISTLEN (LENGTH VEHICLEDATALIST))
-  (SETQ DATACOUNT 0)
-  (WHILE (< DATACOUNT VEHICLEDATALISTLEN)
-    (PROGN
-      (SETQ VARNAME (CAR (NTH DATACOUNT VEHICLEDATALIST)))
-      (SETQ VARVALUE (CADR (NTH DATACOUNT VEHICLEDATALIST)))
-      ;| No need to change to STRINGS just to change right back to REALS
-      (COND
- ((= (TYPE VARVALUE) REAL) (SETQ VARVALUE (RTOS VARVALUE)))
- ((= (TYPE VARVALUE) INT) (SETQ VARVALUE (ITOA VARVALUE)))
-      )|;
-      (SET (READ VARNAME) VARVALUE)
-      (SETQ DATACOUNT (+ 1 DATACOUNT))
+  ;; Body outlines at intervals.
+  (setq i -1)
+  (foreach state states
+    (setq i (1+ i))
+    (if (zerop (rem i plot-frequency))
+      (wiki-turn-draw-pline
+        (wiki-turn-body-corners segment state)
+        (wiki-turn-layer index "BODY")
+        T
+      )
     )
   )
-  (PRINC "\n done with loading and defining")
-  ;|
-  (setq vehName "TestVehicle")
-  (setq VehUnits "M")
-  (setq VehSteerLock 0.0)
-  (setq VehSteerLockTime 0.0)
-  (setq VehArtAngle 20.0)
-  (setq VehFronthang 1220.0)
-  (setq VehWheelbase 6100.0)
-  (setq VehWheelWidth 2000.0)
-  (setq VehBodyLength 9150.0)
-  (setq VehWidth 2440.0)
-  (setq VehRearHitch 2100.0)
-  (setq TrailerHitchToWheel 10000.0)
-  (setq TrailerWheelWidth 2000.0)
-  (setq TrailerFrontHang 1000.0)
-  (setq TrailerBodyLength 12000.0)
-  (setq TrailerWidth 2440.0)
-  |;
-  ;; reform all numeric variables to reals, to ensure all items are reals to avoid rounding
-  (FOREACH
-     VAR '(VEHSTEERLOCK VEHSTEERLOCKTIME VEHARTANGLE VEHFRONTHANG
-           VEHWHEELBASE VEHWHEELWIDTH VEHBODYLENGTH VEHWIDTH
-           VEHREARHITCH TRAILERHITCHTOWHEEL TRAILERWHEELWIDTH
-           TRAILERFRONTHANG TRAILERBODYLENGTH TRAILERWIDTH
-          )
-    (IF (= (TYPE (EVAL VAR)) 'STR)
-      (SET VAR (ATOF (EVAL VAR)))
-    )
-  )
-;;;====================================================================
-  (SETQ
-    FRONTLEFTBUMPANG
-     (ATAN
-       (/ (/ (- VEHWIDTH VEHWHEELWIDTH) 2) VEHFRONTHANG)
-     )
-  )
-  (SETQ
-    FRONTLEFTBUMPDIST
-     (SQRT
-       (+ (* (/ (- VEHWIDTH VEHWHEELWIDTH) 2)
-             (/ (- VEHWIDTH VEHWHEELWIDTH) 2)
-          )
-          (* VEHFRONTHANG VEHFRONTHANG)
-       )
-     )
-  )
-  (SETQ
-    FRONTRIGHTBUMPANG
-     (ATAN
-       (/ (- (/ (- VEHWIDTH VEHWHEELWIDTH) 2) VEHWIDTH)
-          VEHFRONTHANG
-       )
-     )
-  )
-  (SETQ
-    FRONTRIGHTBUMPDIST
-     (SQRT
-       (+ (* (- VEHWIDTH
-                (/ (- VEHWIDTH VEHWHEELWIDTH) 2)
-             )
-             (- VEHWIDTH
-                (/ (- VEHWIDTH VEHWHEELWIDTH) 2)
-             )
-          )
-          (* VEHFRONTHANG VEHFRONTHANG)
-       )
-     )
-  )
-  (SETQ
-    REARLEFTBUMPANG
-     (+ (ATAN
-          (/ (/ (- VEHWIDTH VEHWHEELWIDTH) 2)
-             (- VEHFRONTHANG VEHBODYLENGTH)
-          )
-        )
-        PI
-     )
-  )
-  (SETQ
-    REARLEFTBUMPDIST
-     (SQRT
-       (+ (* (/ (- VEHWIDTH VEHWHEELWIDTH) 2)
-             (/ (- VEHWIDTH VEHWHEELWIDTH) 2)
-          )
-          (* (- VEHFRONTHANG VEHBODYLENGTH)
-             (- VEHFRONTHANG VEHBODYLENGTH)
-          )
-       )
-     )
-  )
-  (SETQ
-    REARRIGHTBUMPANG
-     (+
-       (ATAN
-         (/ (- (/ (- VEHWIDTH VEHWHEELWIDTH) 2) VEHWIDTH)
-            (- VEHFRONTHANG VEHBODYLENGTH)
-         )
-       )
-       PI
-     )
-  )
-  (SETQ
-    REARRIGHTBUMPDIST
-     (SQRT
-       (+ (* (- VEHWIDTH
-                (/ (- VEHWIDTH VEHWHEELWIDTH) 2)
-             )
-             (- VEHWIDTH
-                (/ (- VEHWIDTH VEHWHEELWIDTH) 2)
-             )
-          )
-          (* (- VEHFRONTHANG VEHBODYLENGTH)
-             (- VEHFRONTHANG VEHBODYLENGTH)
-          )
-       )
-     )
-  )
-  (SETQ
-    REARHITCHANG
-     (ATAN
-       (/ (/ VEHWHEELWIDTH 2)
-          (- 0 (+ VEHWHEELBASE VEHREARHITCH))
-       )
-     )
-  )
-  (SETQ
-    REARHITCHDIST
-     (SQRT
-       (+ (* (/ VEHWHEELWIDTH 2) (/ VEHWHEELWIDTH 2))
-          (* (+ VEHWHEELBASE VEHREARHITCH)
-             (+ VEHWHEELBASE VEHREARHITCH)
-          )
-       )
-     )
-  )
-  (SETQ
-    FRONTLEFTTRAILERANG
-     (ATAN (/ (/ TRAILERWIDTH 2) TRAILERFRONTHANG))
-  )
-  (SETQ
-    FRONTLEFTTRAILERDIST
-     (SQRT
-       (+ (* (/ TRAILERWIDTH 2) (/ TRAILERWIDTH 2))
-          (* TRAILERFRONTHANG TRAILERFRONTHANG)
-       )
-     )
-  )
-  (SETQ
-    REARLEFTTRAILERANG
-     (+ (ATAN
-          (/ (/ TRAILERWIDTH 2)
-             (+ TRAILERFRONTHANG TRAILERBODYLENGTH)
-          )
-        )
-        PI
-     )
-  )
-  (SETQ
-    REARLEFTTRAILERDIST
-     (SQRT
-       (+ (* (/ TRAILERWIDTH 2) (/ TRAILERWIDTH 2))
-          (* (+ TRAILERFRONTHANG TRAILERBODYLENGTH)
-             (+ TRAILERFRONTHANG TRAILERBODYLENGTH)
-          )
-       )
-     )
-  )
-)
-;;;
-;;;
-;;;
-(DEFUN
-   DRAWBODY ()
-  (SETQ
-    TRUCKBODYPOLYLIST
-     (LIST
-       (CONS 43 0.0)
-       (CONS 70 1)
-       ;; closed pline if set
-       (CONS 90 4)
-       ;; polyline length
-       (CONS 100 "AcDbPolyline")
-       (CONS 8 (CAR (TURN-GETLAYER "TruckBody")))
-       (CONS 100 "AcDbEntity")
-       (CONS 0 "LWPOLYLINE")
-     )
-  )
-  (SETQ
-    TRUCKBODYPOLYLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PFRONT1
-           (+ FRONTLEFTBUMPANG DIRVEHDRAW)
-           FRONTLEFTBUMPDIST
-         )
-       )
-       TRUCKBODYPOLYLIST
-     )
-  )
-  (SETQ
-    TRUCKBODYPOLYLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PFRONT1
-           (+ FRONTRIGHTBUMPANG DIRVEHDRAW)
-           FRONTRIGHTBUMPDIST
-         )
-       )
-       TRUCKBODYPOLYLIST
-     )
-  )
-  (SETQ
-    TRUCKBODYPOLYLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PFRONT1
-           (+ REARRIGHTBUMPANG DIRVEHDRAW)
-           REARRIGHTBUMPDIST
-         )
-       )
-       TRUCKBODYPOLYLIST
-     )
-  )
-  (SETQ
-    TRUCKBODYPOLYLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PFRONT1
-           (+ REARLEFTBUMPANG DIRVEHDRAW)
-           REARLEFTBUMPDIST
-         )
-       )
-       TRUCKBODYPOLYLIST
-     )
-  )
-  (SETQ TRUCKBODYPOLYLIST (REVERSE TRUCKBODYPOLYLIST))
-  (ENTMAKE TRUCKBODYPOLYLIST)
-)
-;;;
-;;;
-;;;
-(DEFUN
-   DRAWTRAILER ()
-  (SETQ TRAILERBODYPOLYLIST NIL)
-  (SETQ
-    TRAILERBODYPOLYLIST
-     (LIST
-       (CONS 43 0.0)
-       (CONS 70 1)
-       ;; closed pline if set
-       (CONS 90 4)
-       ;; polyline length
-       (CONS 100 "AcDbPolyline")
-       (CONS 8 (CAR (TURN-GETLAYER "TrailerBody")))
-       (CONS 100 "AcDbEntity")
-       (CONS 0 "LWPOLYLINE")
-     )
-  )
-  (SETQ
-    TRAILERBODYPOLYLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PFRONT1
-           (+ DIRVEHDRAW FRONTLEFTTRAILERANG)
-           FRONTLEFTTRAILERDIST
-         )
-       )
-       TRAILERBODYPOLYLIST
-     )
-  )
-  (SETQ
-    TRAILERBODYPOLYLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PFRONT1
-           (- DIRVEHDRAW FRONTLEFTTRAILERANG)
-           FRONTLEFTTRAILERDIST
-         )
-       )
-       TRAILERBODYPOLYLIST
-     )
-  )
-  (SETQ
-    TRAILERBODYPOLYLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PFRONT1
-           (- DIRVEHDRAW REARLEFTTRAILERANG)
-           REARLEFTTRAILERDIST
-         )
-       )
-       TRAILERBODYPOLYLIST
-     )
-  )
-  (SETQ
-    TRAILERBODYPOLYLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PFRONT1
-           (+ DIRVEHDRAW REARLEFTTRAILERANG)
-           REARLEFTTRAILERDIST
-         )
-       )
-       TRAILERBODYPOLYLIST
-     )
-  )
-  (SETQ TRAILERBODYPOLYLIST (REVERSE TRAILERBODYPOLYLIST))
-  (ENTMAKE TRAILERBODYPOLYLIST)
 )
 
-;;; Function TrailerPath
-
-(DEFUN
-   TRAILERPATH ()
-  ;; strip header stuff from trailerpointslist
-  (WHILE (/= (CAR (CAR HITCHPATHLIST)) 10)
-    (SETQ HITCHPATHLIST (CDR HITCHPATHLIST))
+(defun wiki-turn-draw-path (vehicle paths plot-frequency / index segment)
+  (setq index 0)
+  (foreach segment vehicle
+    (wiki-turn-make-segment-layers index)
+    (wiki-turn-draw-segment segment (nth index paths) index plot-frequency)
+    (setq index (1+ index))
   )
-  (SETQ HITCHPATHLISTCOUNT 0)
-  (SETQ PPLT1 (CDR (NTH 0 HITCHPATHLIST)))
-  (SETQ PFRONT1 PPLT1)
-  ;; get first trailer point
-  ;; Note that Dirtrailer was set at start of turn from direction of vehicle/trailer block
-  (SETQ DIRVEH1 DIRTRAILER)
-  (SETQ LVEH TRAILERHITCHTOWHEEL)
-  (SETQ PREAR1 (POLAR PPLT1 DIRVEH1 LVEH))
-  (SETQ DIRVEHDRAW (ANGLE PREAR1 PFRONT1))
-  (DRAWTRAILER)
-  ;;
-  ;;_______Initiate Rear Left Trailer Path
-  (SETQ
-    REARLEFTTRAILERTIREPATHLIST
-     (LIST
-       (CONS 43 0.0)
-       (CONS 70 128)
-;;; plinegen added 2008-04-10 by Tom Haws
-       (CONS 90 PATHSEGMENTS)
-       ;; polyline length
-       (CONS 100 "AcDbPolyline")
-       (CONS
-         8
-         (CAR
-           (TURN-GETLAYER
-             "TrailerBackLeftTirePath"
-           )
-         )
-       )
-       (CONS 100 "AcDbEntity")
-       (CONS 0 "LWPOLYLINE")
-     )
-  )
-  (SETQ
-    REARLEFTTRAILERTIREPATHLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PREAR1
-           (+ DIRVEH1 (/ PI 2))
-           (/ TRAILERWHEELWIDTH 2)
-         )
-       )
-       REARLEFTTRAILERTIREPATHLIST
-     )
-  )
-  ;;_______Complete Initiate Rear Left Path (Tom Haws 2008-04-10)
-  ;;
-  ;;_______Initiate Rear Right Path
-  ;;Initiation lacked items.  Fixed 2008-04-10 Tom Haws
-  (SETQ
-    REARRIGHTTRAILERTIREPATHLIST
-     (LIST
-       (CONS 43 0.0)
-       (CONS 70 128)
-;;; plinegen added 2008-04-10 by Tom Haws
-       (CONS 90 PATHSEGMENTS)
-       ;; polyline length
-       (CONS 100 "AcDbPolyline")
-       ;; polyline length
-       (CONS
-         8
-         (CAR
-           (TURN-GETLAYER
-             "TrailerBackRightTirePath"
-           )
-         )
-       )                                ;(CONS 100 "AcDbPolyline")
-       (CONS 100 "AcDbEntity")
-       (CONS 0 "LWPOLYLINE")
-     )
-  )
-  (SETQ
-    REARRIGHTTRAILERTIREPATHLIST
-     (CONS
-       (CONS
-         10
-         (POLAR
-           PREAR1
-           (- DIRVEH1 (/ PI 2))
-           (/ TRAILERWHEELWIDTH 2)
-         )
-       )
-       REARRIGHTTRAILERTIREPATHLIST
-     )
-  )
-  ;;_______Complete Initiate Rear Right Path
-  (SETQ HITCHPATHLISTCOUNT (1+ HITCHPATHLISTCOUNT))
-  (WHILE (< HITCHPATHLISTCOUNT PATHSEGMENTS)
-    (SETQ PFRONT2 (CDR (NTH HITCHPATHLISTCOUNT HITCHPATHLIST)))
-    (SETQ
-      ;; angle of travel this step
-      DIRTRV
-       (ANGLE PFRONT1 PFRONT2)
-    )
-    ;; angle between angle of travel and angle of vehicle
-    (SETQ ALPHA (- DIRVEH1 DIRTRV))
-    ;;Distance front wheels traveled this step
-    (SETQ DSTTRV (DISTANCE PFRONT1 PFRONT2))
-    (SETQ
-      ;;Angle vehicle turned this step
-      ANGTRN
-       (* 2
-          (ATAN
-            (/ (SIN ALPHA) (- (/ (* 2 LVEH) DSTTRV) (COS ALPHA)))
-          )
-       )
-    )
-    (SETQ DIRVEH2 (+ DIRVEH1 ANGTRN))
-    (SETQ PREAR2 (POLAR PFRONT2 DIRVEH2 LVEH))
-    (SETQ PFRONT1 PFRONT2)
-    (SETQ PREAR1 PREAR2)
-    (SETQ DIRVEH1 DIRVEH2)
-    (SETQ DIRREAR2 (ANGLE PPLT1 PREAR2))
-    (SETQ DIRVEHDRAW (+ PI DIRVEH2))
-    ;;Logic change 2008-04-10 Tom Haws
-    (IF (= (REM HITCHPATHLISTCOUNT *TURN-PLOTFREQUENCY*) 0)
-      (DRAWTRAILER)
-    )
-    (SETQ
-      REARLEFTTRAILERTIREPATHLIST
-       (CONS
-         (CONS
-           10
-           (POLAR
-             PREAR1
-             (+ DIRVEH1 (/ PI 2))
-             (/ TRAILERWHEELWIDTH 2)
-           )
-         )
-         REARLEFTTRAILERTIREPATHLIST
-       )
-    )
-    (SETQ
-      REARRIGHTTRAILERTIREPATHLIST
-       (CONS
-         (CONS
-           10
-           (POLAR
-             PREAR1
-             (- DIRVEH2 (/ PI 2))
-             (/ TRAILERWHEELWIDTH 2)
-           )
-         )
-         REARRIGHTTRAILERTIREPATHLIST
-       )
-    )
-    (SETQ
-      DIRREAR1 DIRREAR2
-      PPLT1 PREAR2
-    )
-    (SETQ HITCHPATHLISTCOUNT (1+ HITCHPATHLISTCOUNT))
-  )
-  (DRAWTRAILER)
-  (SETQ
-    REARLEFTTRAILERTIREPATHLIST
-     (REVERSE REARLEFTTRAILERTIREPATHLIST)
-  )
-  (ENTMAKE REARLEFTTRAILERTIREPATHLIST)
-  (SETQ
-    REARRIGHTTRAILERTIREPATHLIST
-     (REVERSE REARRIGHTTRAILERTIREPATHLIST)
-  )
-  (ENTMAKE REARRIGHTTRAILERTIREPATHLIST)
 )
 
-;; VEHICLEDATAGET gets the vehicle attributes from a BUILDVEHICLE
-;; defined block.
-;; Returns a list of vehicle properties.
-(DEFUN
-   VEHICLEDATAGET (/ CHANGEFROMDEFAULT CONTINUELOAD ENTITYTYPE TAG VALUE
-                   VEHICLEDATALISTLEN VEHICLEBLOCKNAME VEHICLEENTITYLIST
-                  )
-  (SETQ VEHICLEDATALIST NIL)
-  (SETQ VEHICLEBLOCKNAME NIL)
-  ;;Prompt change 2008-04-10 Tom Haws
-  (SETQ VEHICLEBLOCKNAME (CAR (ENTSEL "\nSelect vehicle block: ")))
-  (SETQ CHANGEFROMDEFAULT 0)
-  ;;If a block was selected, get its data.  Otherwise alert and fail.
-  (COND
-    ((AND
-       VEHICLEBLOCKNAME
-       (SETQ VEHICLEENTITYLIST (ENTGET VEHICLEBLOCKNAME))
-       (SETQ ENTITYTYPE (CDR (ASSOC 0 VEHICLEENTITYLIST)))
-       (= ENTITYTYPE "INSERT")
-     )
-     ;;Preload default vehicle
-     (PROGN
-       (SETQ
-         VEHICLEDATALIST
-          (LIST
-            (LIST "VEHENTNAME" VEHICLEBLOCKNAME)
-            (LIST "VEHNAME" "TestVehicle")
-            (LIST "VEHUNITS" "M")
-            (LIST "VEHSTEERLOCK" 0.0)
-            (LIST "VEHSTEERLOCKTIME" 0.0)
-            (LIST "VEHARTANGLE" 20.0)
-            (LIST "VEHFRONTHANG" 1220.0)
-            (LIST "VEHWHEELBASE" 6100.0)
-            (LIST "VEHWHEELWIDTH" 2000.0)
-            (LIST "VEHBODYLENGTH" 9150.0)
-            (LIST "VEHWIDTH" 2440.0)
-            (LIST "VEHREARHITCH" 2100.0)
-            (LIST "TRAILHAVE" "N")
-            (LIST "TRAILNAME" "TestVehicle")
-            (LIST "TRAILUNITS" "M")
-            (LIST "TRAILERHITCHTOWHEEL" 10000.0)
-            (LIST "TRAILERWHEELWIDTH" 2000.0)
-            (LIST "TRAILERFRONTHANG" 1000.0)
-            (LIST "TRAILERBODYLENGTH" 12000.0)
-            (LIST "TRAILERWIDTH" 2440.0)
-          )
-       )
-       (SETQ VEHICLEDATALISTLEN (LENGTH VEHICLEDATALIST))
-       (SETQ CONTINUELOAD "YES")
-       (WHILE (AND
-                (SETQ VEHICLEBLOCKNAME (ENTNEXT VEHICLEBLOCKNAME))
-                (= CONTINUELOAD "YES")
-              )
-         (SETQ VEHICLEENTITYLIST (ENTGET VEHICLEBLOCKNAME))
-         (SETQ ENTITYTYPE (CDR (ASSOC 0 VEHICLEENTITYLIST)))
-         (COND
-           ((= ENTITYTYPE "ATTRIB")
-            (PROGN
-              (SETQ VALUE (CDR (ASSOC 1 VEHICLEENTITYLIST)))
-              (SETQ TAG (CDR (ASSOC 2 VEHICLEENTITYLIST)))
-              ;;subst values in list
-              ;;if a value has been substituted (even with same value),
-              ;;then increment ChangeFromDefault by one
-              (SETQ COUNT 0)
-              (WHILE (< COUNT VEHICLEDATALISTLEN)
-                (IF (= (CAR (NTH COUNT VEHICLEDATALIST)) TAG)
-                  (PROGN
-                    (SETQ OLDPAIR (NTH COUNT VEHICLEDATALIST))
-                    (SETQ NEWPAIR (LIST TAG VALUE))
-                    (SETQ
-                      VEHICLEDATALIST
-                       (SUBST
-                         NEWPAIR
-                         OLDPAIR
-                         VEHICLEDATALIST
-                       )
-                    )
-                    (SETQ CHANGEFROMDEFAULT (+ CHANGEFROMDEFAULT 1))
-                  )
-                )
-                (SETQ COUNT (+ 1 COUNT))
-              )
-            )
-           )
-           ((= ENTITYTYPE "SEQEND") (SETQ CONTINUELOAD "NO"))
-         )
-       )
-     )
-    )                                   ;end progn
-    (T
-     (ALERT
-       (PRINC
-         "\n ENTITY SELECTED IS NOT A VALID BLOCK.\n\nRUN BUILDVEHICLE TO DEFINE A VEHICLE."
-       )
-     )
-    )
-  )
-  ;;check if ChangeFromDefault matches required data list length.  if not, then
-  ;;report that not all data was found, and that some default values are being used
-  (COND
-    ((= CHANGEFROMDEFAULT 0)
-     (ALERT
-       (PRINC
-         "\n NO DIMENSIONS OR DATA FOUND.\nPLEASE CHECK THAT SOURCE ENTITY IS VALID.\nDEFAULT VALUES WILL BE USED.\n\nRUN BUILDVEHICLE TO DEFINE A VEHICLE."
-       )
-     )
-    )
-    ((= CHANGEFROMDEFAULT (1- VEHICLEDATALISTLEN))
-                                        ;Edited 2008-04-10 Tom Haws. 
-     (PRINC
-       "\n ALL DIMENSIONS AND DATA FOUND, CUSTOMIZED VEHICLE HAS BEEN DEFINED"
-     )
-    )
-    (ALERT
-     (PRINC
-       "\n SOME DIMENSIONS OR DATA FOUND.  PLEASE VERIFY THAT SOURCE BLOCK IS VALID.  SOME DEFAULT VALUES WILL BE USED"
-     )
-    )
-  )
-  (SETQ VEHICLEBLOCKNAME NIL)
-  VEHICLEDATALIST
-)
-;;; Instead of computing path and plotting on the fly, for modular benefit, I want to build a path list and then
-;;; use the list to plot things and get info.
-;;; Here's how I think the list should look:
-;;; The main list is a list of time frames.  The first time frame has no calculated data; only starting data.
-;;; Each time frame list is a list of various vehicle segments.
-;;; Each vehicle segment list is a list of points and dimensions for that vehicle segment
+;;; ---------------------------------------------------------------------------
+;;; The swept-path envelope
+;;; ---------------------------------------------------------------------------
+;;; No version of TURN has ever drawn this, and it is the thing an engineer
+;;; actually puts on a plan sheet: the outer boundary of every square foot the
+;;; rig touches.
 ;;;
-;;; CODE  ITEM
-;;;  11   VFL (VEHICLE FRONT LEFT CORNER)
-;;;  12   AFL (AXLE           ""  "")
-;;;  13   ABL (AXLE    BACK   ""  "")
-;;;  14   VBL 
-;;;  22   AFM (              MIDDLE) 
-;;;  23   ABM 
-;;;  25   HITCH/HINGE
-;;;  31   VFR 
-;;;  32   AFR 
-;;;  33   ABR 
-;;;  34   VBR 
-;;;  41   RFRONT
-;;;  42   RBACK
-;;;  43   RHINGE
-;;;  50   DIRVEH
-;;;  51   FRONT WHEEL TILT OR ARTICULATION ANGLE (CCW/LEFT +)
-;;;  52   INCREASE IN TILT/ANGLE FROM LAST TIME STEP (CCW/LEFT +)
-;;;           
-(DEFUN
-   TURN-MAIN-USER-BLOCK-METHOD (/ ANGTILT ANGTRV DIRVEH1 DIRVEH2 DSTTRV
-                                EMARK ENI ES1 I LVEH OSMOLD PATHLIST
-                                PFRONT1 PFRONT2 PBACK1 PBACK2 STEP
+;;; The boundary of a swept region is a polygon-union problem, and a polygon
+;;; union written in AutoLISP over a few hundred bodies would be too slow to
+;;; use. AutoCAD already has the boolean, in C++, in the REGION and UNION
+;;; commands. So: lay down the body outline at EVERY step (not at the plot
+;;; frequency - the plotted boxes are a sparse illustration, the envelope needs
+;;; the dense sweep), turn them into regions, union them, and reduce the result
+;;; back to polylines.
+;;;
+;;; Consecutive bodies overlap heavily - a step is a fraction of a wheelbase
+;;; and a body is longer than its wheelbase - so the union has no gaps. The
+;;; only error is the chord-versus-arc sagitta between steps, which is the same
+;;; discretisation the tire paths already carry.
+
+;; Every entity created after MARKER, in database order. A marker of nil means
+;; "everything". Used to find what a command produced without trusting entlast
+;; to still point at it.
+(defun wiki-turn-entities-after (marker / en out)
+  (setq en (if marker (entnext marker) (entnext)))
+  (while en
+    (setq out (cons en out)
+          en (entnext en)
+    )
+  )
+  (reverse out)
+)
+
+(defun wiki-turn-selection (enames / ss)
+  (setq ss (ssadd))
+  (foreach en enames (ssadd en ss))
+  ss
+)
+
+;; Returns the swept area, or nil if no envelope was produced.
+;; The shortest body in the rig. The envelope lays each body outline down once
+;; per calculation step, so this is the distance a step must stay under if
+;; consecutive placements are to overlap at all.
+(defun wiki-turn-shortest-body (vehicle / len best)
+  (foreach segment vehicle
+    (setq len (wiki-turn-seg-get segment "body-length"))
+    (if (or (null best) (< len best)) (setq best len))
+  )
+  best
+)
+
+;; The smallest body area, used as the scale against which a loop counts as
+;; real geometry rather than union litter.
+(defun wiki-turn-smallest-body-area (vehicle / a best)
+  (foreach segment vehicle
+    (setq a (* (wiki-turn-seg-get segment "body-length")
+               (wiki-turn-seg-get segment "body-width")))
+    (if (or (null best) (< a best)) (setq best a))
+  )
+  best
+)
+
+;; A union of hundreds of overlapping rectangles leaves the odd loop of
+;; essentially no area where two boundaries almost coincide. That is arithmetic
+;; litter, not swept path, and it is indistinguishable from real geometry once
+;; it is sitting on the layer. Anything above the tolerance is left alone: a
+;; genuine hole is the drawing telling the truth about a coarse step, and
+;; deleting it would hide that.
+(defun wiki-turn-drop-slivers (entities tolerance / a dropped)
+  (setq dropped 0)
+  (foreach en entities
+    (command "._area" "_object" en)
+    (setq a (getvar "area"))
+    (if (< a tolerance)
+      (progn (entdel en) (setq dropped (1+ dropped)))
+    )
+  )
+  dropped
+)
+
+;; Nothing closes in AutoCAD unless you tell it to. PEDIT Join joins; it does not
+;; close, and there was never any reason to expect it would. So a loop comes back
+;; with its first and last vertices coinciding exactly and its Closed flag off -
+;; measured on Tom's 1284-vertex envelope, end gap 0.000, Closed "no". It looks
+;; shut on screen and is not, and hatching, offset, AREA and any boolean
+;; downstream all refuse it.
+;;
+;; This is the telling, and it is done here rather than with PEDIT Close so the
+;; duplicated last vertex goes too: closing over a coincident pair would leave a
+;; zero-length segment behind, which is its own nuisance downstream.
+;;
+;; A loop whose ends are genuinely apart is left alone and counted. That is
+;; missing geometry rather than a missing flag, and the two want opposite fixes.
+(defun wiki-turn-close-loops (entities layer tolerance / closed el gap opened pts)
+  (setq closed 0 opened 0)
+  (foreach en entities
+    (setq
+      el (entget en)
+      pts (mapcar 'cdr (vl-remove-if-not '(lambda (x) (= 10 (car x))) el))
+    )
+    (cond
+      ((< (length pts) 3) nil)
+      ((= 1 (logand 1 (cdr (assoc 70 el)))) nil)   ; already closed
+      ((< (setq gap (distance (car pts) (last pts))) tolerance)
+       (wiki-turn-draw-pline (reverse (cdr (reverse pts))) layer T)
+       (entdel en)
+       (setq closed (1+ closed))
+      )
+      (t (setq opened (1+ opened)))
+    )
+  )
+  (list closed opened)
+)
+
+(defun wiki-turn-draw-envelope (vehicle paths / area clayer index layer loops
+                                marker peditaccept regions segment ss state
+                                kept slivers shut
                                )
-  (SETQ
-    ES1
-     (ENTSEL
-       "\nSelect front axle path polyline at starting end: "
-     )
-    PFRONT1
-     (OSNAP (CADR ES1) "endp")
-    PBACK1
-     (GETPOINT
-       PFRONT1
-       "\nEnter initial midpoint of back axle (TURN.LSP calculates wheelbase length and starting vehicle orientation from point entered): "
-     )
-    PPLT1 PBACK1
-    LVEH
-     (DISTANCE PFRONT1 PBACK1)
-    DIRVEH1
-     (ANGLE PFRONT1 PBACK1)
-    *TURN-CALCULATIONSTEP*
-     (GETDISTX
-       PFRONT1
-       "\nCalculation step distance along front axle path"
-       *TURN-CALCULATIONSTEP*
-       (/ LVEH 10.0)
-     )
-    *TURN-PLOTFREQUENCY*
-     (GETINTX
-       "\nNumber of calculation steps to skip between vehicle plots"
-       *TURN-PLOTFREQUENCY*
-       50
-     )
-    *TURN-VEHBLK*
-     (CDR
-       (ASSOC
-         2
-         (TBLSEARCH
-           "BLOCK"
-           (GETSTRINGX
-             "Block name to place along path, or . for none"
-             *TURN-VEHBLK*
-             "TURNVEHICLE"
-           )
-         )
+  (wiki-turn-make-vehicle-layers)
+  (setq
+    layer (wiki-turn-layer nil "ENVL")
+    marker (entlast)
+    index 0
+    clayer (getvar "clayer")
+  )
+  ;; REGION, UNION and EXPLODE put their output on the CURRENT layer, not on
+  ;; the layer of the objects they consumed. entmake honours the layer it is
+  ;; given; these commands do not. So make the envelope layer current for the
+  ;; whole operation.
+  (setvar "clayer" layer)
+  (foreach segment vehicle
+    (foreach state (nth index paths)
+      (wiki-turn-draw-pline (wiki-turn-body-corners segment state) layer T)
+    )
+    (setq index (1+ index))
+  )
+  (setq ss (wiki-turn-selection (wiki-turn-entities-after marker)))
+  (cond
+    ((zerop (sslength ss)) (setvar "clayer" clayer) nil)
+    (t
+     (command "._region" ss "")
+     ;; REGION consumes the polylines, so whatever survives after the marker is
+     ;; the regions it made.
+     (setq regions (wiki-turn-entities-after marker))
+     (if (< 1 (length regions))
+       (progn
+         (command "._union" (wiki-turn-selection regions) "")
+         (setq regions (wiki-turn-entities-after marker))
        )
      )
-    SS1
-     (SSADD)
-    OSMOLD
-     (GETVAR "osmode")
+     ;; AREA _Object on a region reports its area, islands already deducted.
+     ;; Read it before exploding, while there is still a region to ask.
+     (setq area 0.0)
+     (foreach en regions
+       (command "._area" "_object" en)
+       (setq area (+ area (getvar "area")))
+     )
+     ;; Reduce to polylines. A region is not editable geometry; a closed
+     ;; LWPOLYLINE is what an engineer offsets, hatches and plots.
+     (setq peditaccept (getvar "peditaccept"))
+     (setvar "peditaccept" 1)
+     (command "._explode" (wiki-turn-selection regions))
+     (command "._pedit" "_multiple" (wiki-turn-selection (wiki-turn-entities-after marker)) ""
+              "_join" 0.0 ""
+     )
+     (setvar "peditaccept" peditaccept)
+     ;; Clear the litter, then say how many loops are really there. More than
+     ;; one means the envelope encloses holes, which is worth saying out loud
+     ;; rather than leaving as stray polylines nobody can account for.
+     (setq
+       slivers
+        (wiki-turn-drop-slivers (wiki-turn-entities-after marker)
+                                (* 1e-4 (wiki-turn-smallest-body-area vehicle)))
+       shut
+        (wiki-turn-close-loops (wiki-turn-entities-after marker) layer
+                               (* 1e-6 (wiki-turn-shortest-body vehicle)))
+       loops (length (wiki-turn-entities-after marker))
+     )
+     (if (< 0 slivers)
+       (princ (strcat "\nTURN: discarded " (itoa slivers)
+                      " zero-area sliver(s) left by the union."))
+     )
+     (if (< 0 (cadr shut))
+       (princ (strcat "\nTURN: " (itoa (cadr shut))
+                      " envelope loop(s) did not close. The boundary has a gap in it."))
+     )
+     (cond
+       ((= 1 loops) (princ "\nTURN: envelope is one closed boundary."))
+       ((< 1 loops)
+        (princ (strcat "\nTURN: envelope is " (itoa loops)
+                       " closed loops - one outer boundary and "
+                       (itoa (1- loops)) " hole(s) inside it."))
+       )
+     )
+     (setvar "clayer" clayer)
+     area
+    )
   )
-  (SETVAR "osmode" 0)
-  (COMMAND "._undo" "g" "._point" PFRONT1)
-  (SETQ
-    ENI (ENTLAST)
-    SS1 (SSADD ENI SS1)
+)
+
+;; The whole job, with no prompting anywhere: track, draw, report.
+;; c:turn is a thin prompting shell over this. Tests call it directly, which is
+;; why the integration suite needs no simulated keystrokes.
+(defun wiki-turn-run (vehicle course heading-0 plot-frequency / area paths)
+  (setq paths (wiki-turn-path vehicle course heading-0))
+  (wiki-turn-draw-path vehicle paths plot-frequency)
+  (if (= "Yes" (wiki-turn-getvar "general.drawenvelope"))
+    (setq area (wiki-turn-draw-envelope vehicle paths))
   )
-  (COMMAND "._measure" ES1 *TURN-CALCULATIONSTEP*)
-  (WHILE (SETQ ENI (ENTNEXT ENI)) (SETQ SS1 (SSADD ENI SS1)))
-  (SETQ I (1- (SSLENGTH SS1)))
-  ;; Reverse order of ._MEASURE points if PLINE drawn "backwards".
-  ;;(if picked point is closer to last MEASURE command point than first)
-  (IF (< (DISTANCE
-           (TRANS
-             ;; the coordinates of the point to translate
-             (CDR (ASSOC 10 (ENTGET (SSNAME SS1 I))))
-             ;; from pline coordinate system
-             (SSNAME SS1 I)
-             ;; to user coordinate system
-             1
-           )
-           ;; the picked point, which is in the user coordinate system
-           PFRONT1
-         )
-         (DISTANCE
-           (TRANS
-             ;; the coordinates of the point to translate
-             (CDR (ASSOC 10 (ENTGET (SSNAME SS1 1))))
-             ;; from pline coordinate system
-             (SSNAME SS1 1)
-             ;; to user coordinate system
-             1
-           )
-           ;; the picked point, which is in the user coordinate system
-           PFRONT1
-         )
+  (wiki-turn-report vehicle paths area)
+  paths
+)
+
+;; Below this many rig wheelbases of travel, an articulated rig never reaches
+;; the articulation it would really settle at, and plots looking far straighter
+;; than the truth. Advice, not a verdict: a short course is not an error, it
+;; just does not show you much.
+(setq *wiki-turn-short-course* 5.0)
+
+(defun wiki-turn-report (vehicle paths area / body findings len radius ratio spacing wheelbase)
+  (setq findings (wiki-turn-findings vehicle paths))
+  (princ (strcat "\nTURN: " (itoa (length vehicle)) " segment(s), "
+                 (itoa (length (car paths))) " steps."))
+  (setq
+    len (wiki-turn-course-length (car paths))
+    wheelbase (wiki-turn-rig-wheelbase vehicle)
+  )
+  (if (< 0.0001 wheelbase)
+    (progn
+      (setq ratio (/ len wheelbase))
+      (princ (strcat "\nTURN: course " (rtos len 2 1) " long, " (rtos ratio 2 1)
+                     " x the rig's " (rtos wheelbase 2 1) " wheelbase."))
+      ;; A step longer than the shortest body means consecutive placements of
+      ;; that body do not overlap, so the swept envelope is guaranteed to come
+      ;; out with gaps in it. That is not a union bug; it is the sampling being
+      ;; coarser than the thing being sampled.
+      (if (and (< 1 (length (car paths)))
+               (setq body (wiki-turn-shortest-body vehicle))
+               (> (setq spacing (distance (wiki-turn-guide (car (car paths)))
+                                          (wiki-turn-guide (cadr (car paths)))))
+                  body))
+        (princ
+          (strcat
+            "\n  ! Calculation step " (rtos spacing 2 2) " is longer than the shortest"
+            "\n    body (" (rtos body 2 2) "), so the envelope will have gaps between"
+            "\n    consecutive positions. Re-run with a step well under "
+            (rtos body 2 2) "."
+          )
+        )
       )
-    (WHILE (< 0 (SETQ I (1- I)))
-      (SETQ ENI (SSNAME SS1 I))
-      (SSDEL ENI SS1)
-      (SSADD ENI SS1)
-    )
-  )
-  ;;First element in pathlist doesn't have any radius info.
-  (SETQ
-    I 0
-    PATHLIST
-     (LIST
-       (LIST
-         (CONS 22 PFRONT1)
-         (CONS 23 PBACK1)
-         (CONS 50 DIRVEH1)
-       )
-     )
-  )
-  ;; For every ._MEASURE point, calculate points and dimensions and add to pathlist
-  ;; For now, only one vehicle is calculated.
-  ;; To add more, change the initial prompts to keep asking for successive back points.
-  (WHILE (SETQ ENI (SSNAME SS1 (SETQ I (1+ I))))
-    (SETQ
-      PFRONT2
-       (TRANS (CDR (ASSOC 10 (ENTGET ENI))) ENI 1)
-      ;; Direction of displacement of front wheels
-      DIRTRV
-       (ANGLE PFRONT1 PFRONT2)
-      ;; Angle between travel vector and original vehicle front-to-back vector
-      ALPHA
-       (- DIRVEH1 DIRTRV)
-      ;; Distance front wheels traveled this step
-      DSTTRV
-       (DISTANCE PFRONT1 PFRONT2)
-      ;; Angle vehicle turned this step
-      ANGTRN
-       (* 2
-          (ATAN
-            (/ (SIN ALPHA) (- (/ (* 2 LVEH) DSTTRV) (COS ALPHA)))
+      ;; Only worth saying for something that articulates. A single unit is
+      ;; tracking its true path almost immediately.
+      (if (and (cdr vehicle) (< ratio *wiki-turn-short-course*))
+        (princ
+          (strcat
+            "\n  ! Short course. A trailer takes several rig lengths to settle into its"
+            "\n    true articulation. Hundreds of feet is normal; long does not hurt."
           )
-       )
-      DIRVEH2
-       (+ DIRVEH1 ANGTRN)
-      ;; Average front wheel radius this step
-      RFRONT
-       (/ DSTTRV (* 2.0 (SIN (/ ANGTRN 2.0))))
-      ;; Average wheel tilt or articulation angle this step
-      ANGTILT
-       (TURN-ASIN (/ LVEH RFRONT))
-      ;; Average back wheel radius this step
-      RBACK
-       (/ LVEH (TURN-TAN ANGTILT))
-      PBACK2
-       (POLAR PFRONT2 DIRVEH2 LVEH)
-      PFRONT1 PFRONT2
-      PBACK1 PBACK2
-      DIRVEH1 DIRVEH2
-      ;;For now, only one vehicle is calculated.
-      PATHLIST
-       (CONS
-         (LIST
-           (CONS 22 PFRONT1)
-           (CONS 23 PBACK1)
-           (CONS 41 RFRONT)
-           (CONS 42 RBACK)
-           (CONS 50 DIRVEH1)
-           (CONS 51 TILTANG)
-         )
-         PATHLIST
-       )
-      PPLT1 PBACK2
+        )
+      )
     )
   )
-  (SETQ PATHLIST (REVERSE PATHLIST))
-  ;; Erase the ._MEASURE points.
-  (COMMAND "._erase" SS1 "")
-  ;;Draw a polyline following one of the points in pathlist
-  (COMMAND "._pline" (CDR (ASSOC 23 (CAR PATHLIST))) "w" 0 "")
-  (FOREACH
-     STEP (CDR PATHLIST)
-    (COMMAND (CDR (ASSOC 23 STEP)))
+  (if area
+    (princ (strcat "\nTURN: swept area is " (rtos area 2 1) " square drawing units."))
   )
-  (COMMAND "")
-  ;; Loop insert a block representing one of the vehicles in pathlist.
-  (COND
-    (*TURN-VEHBLK*
-     (SETQ I (* -1 *TURN-PLOTFREQUENCY*))
-     (WHILE (SETQ STEP (NTH (SETQ I (+ I *TURN-PLOTFREQUENCY*)) PATHLIST))
-       (ENTMAKE
-         (LIST
-           (CONS 0 "INSERT")
-           (CONS 2 *TURN-VEHBLK*)
-           (CONS 8 (GETVAR "CLAYER"))
-           (CONS 10 (CDR (ASSOC 22 STEP)))
-           (CONS 41 1.0)
-           (CONS 42 1.0)
-           (CONS 43 1.0)
-           (CONS 50 (CDR (ASSOC 50 STEP)))
-         )
-       )
-       (ENTMAKE '((0 . "SEQEND")))
-     )
+  (if (setq radius (wiki-turn-min-radius (car vehicle)))
+    (princ (strcat "\nTURN: tightest turn this vehicle can make is "
+                   (rtos radius 2 2) " radius at the steering axle."))
+  )
+  (cond
+    (findings
+     (foreach f findings (princ (strcat "\n  ! " f)))
+     (princ "\nTURN: this manoeuvre is NOT achievable as drawn.")
     )
+    (t (princ "\nTURN: manoeuvre achievable. No limits exceeded."))
   )
-  (SETVAR "osmode" OSMOLD)
-  (COMMAND "._undo" "e")
-  (REDRAW)
-  (PRINC)
+  findings
 )
 
-;;; Not yet used.
-;;; See TURN-MAIN-USER-BLOCK-METHOD for the working partial impementation of this.
-;;; Function TRAILINGPATH
-;;; Returns a list of points that define a wheel path
-;;; that trails a given front wheel path
-;;; with the initial point of the trailing path as given
-;;; Usage:
-;;;   (trailingpath
-;;;     frontpath     The list of points that define the front path
-;;;     rearstart     The first point on the trailing path
-;;;   )
-;;; Not yet used.
-;;;
-;;; Instead of computing path and plotting on the fly, for modular benefit, I want to build a path list and then
-;;; use the list to plot things and get info.
-;;; Here's how I think the list should look:
-;;; The main list is a list of time frames
-;;; Each time frame list is a list of various vehicle segments
-;;; Each vehicle segment list is a list of points and dimensions for that vehicle segment
-;;;
-;;; CODE  ITEM
-;;;  11   VFL (VEHICLE FRONT LEFT CORNER)
-;;;  12   AFL (AXLE           ""  "")
-;;;  13   ABL (AXLE    BACK   ""  "")
-;;;  14   VBL
-;;;  22   AFM (              MIDDLE)
-;;;  23   ABM
-;;;  25   HITCH/HINGE
-;;;  31   VFR (VEHICLE FRONT RIGHT CORNER)
-;;;  32   AFR (VEHICLE FRONT RIGHT CORNER)
-;;;  33   ABR (VEHICLE FRONT RIGHT CORNER)
-;;;  34   VBR (VEHICLE FRONT RIGHT CORNER)
-;;;  41   RFRONT (FRONT PATH RADIUS)
-;;;  42   RBACK (BACK PATH RADIUS)
-;;;  43   RHINGE (HINGE RADIUS)
-;;;  50   DIRVEH (VEHICLE DIRECTION)
-;;;  51   FRONT WHEEL TILT OR ARTICULATION ANGLE (CCW/LEFT +)
-;;;  52   INCREASE IN TILT/ANGLE FROM LAST TIME STEP (CCW/LEFT +)
-(DEFUN
-   TRAILINGPATH (FRONTPATH REARSTART / I J)
-  (SETQ
-    I 0
-    PATHLISTLENGTH
-     (LENGTH FRONTPATH)
-    PREAR1 REARSTART
-    REARPATH
-     (LIST REARSTART)
-  )
-  ;; For every point on front wheel path,
-  ;; calculate a point on rear wheel path
-  (WHILE (< (SETQ I (1+ I)) PATHLISTLENGTH)
-    (SETQ
-      ;; Set initial point to the previous point
-      PFRONT1
-       (NTH (1- I) FRONTPATH)
-      ;; Set final point to current point
-      PFRONT2
-       (NTH I FRONTPATH)
-      ;; Initial direction of vehicle
-      DIRVEH1
-       (ANGLE PREAR1 PFRONT1)
-      ;; Angle of travel this step
-      DIRTRV
-       (ANGLE PFRONT1 PFRONT2)
-      ;; Angle between angle of travel and angle of vehicle
-      ALPHA
-       (- DIRVEH1 DIRTRV)
-      ;; Distance front wheels traveled this step
-      DSTTRV
-       (DISTANCE PFRONT1 PFRONT2)
-      ;; Angle vehicle turned this step
-      ANGTRN
-       (* 2
-          (ATAN
-            (/ (SIN ALPHA) (- (/ (* 2 LVEH) DSTTRV) (COS ALPHA)))
-          )
-       )
-      ;; Direction of vehicle at end of this step
-      DIRVEH2
-       (+ DIRVEH1 ANGTRN)
-      ;; Location of rear wheel at end of this step
-      PREAR2
-       (POLAR PFRONT2 DIRVEH2 LVEH)
-      ;; Direction the rear wheel traveled this step
-      DIRREAR2
-       (ANGLE PREAR1 PREAR2)
-      ;; Save this step's variables
-      PFRONT1
-       PFRONT2
-      PREAR1 PREAR2
-      DIRVEH1 DIRVEH2
-      DIRREAR1 DIRREAR2
-      REARPATH
-       (CONS PREAR2 REARPATH)
-       ;;End saving
-    )
-  )
-  (REVERSE REARPATH)
+;;; ===========================================================================
+;;; SECTION 7  COMMANDS
+;;; ===========================================================================
+;;; The block a vehicle is drawn as points in -X: the insertion point is the
+;;; middle of the front bumper and the body runs off in +X. 1.1.x built them
+;;; that way and read the heading back as (block rotation + pi), so every
+;;; vehicle block ever made still reads correctly. Do not "fix" this.
+
+(setq
+  *wiki-turn-calculationstep* nil
+  *wiki-turn-plotfrequency* 10
 )
 
-;;; GETDISTX
-;;; Copyright Thomas Gail Haws 2006
-;;; Get a distance providing the current value or a vanilla default.
-;;; Usage: (getdistx startingpoint promptstring currentvalue vanilladefault)
-(DEFUN
-   GETDISTX (STARTINGPOINT PROMPTSTRING CURRENTVALUE VANILLADEFAULT)
-  (SETQ
-    CURRENTVALUE
-     (COND
-       (CURRENTVALUE)
-       (VANILLADEFAULT)
-       (0.0)
-     )
+;; The calculation step to offer.
+;;
+;; Remembering the last step is a real convenience when you run the same vehicle
+;; again. It becomes a trap when the next vehicle is a different size, because
+;; the memory used to beat the computed default unconditionally: a WB-67 whose
+;; drawing declared inches has a wheelbase of 234, so its default step was 23.4,
+;; and that 23.4 was then offered for a rig whose own default was 1.2. Pressing
+;; Enter accepted it and the swept envelope came out full of holes, because the
+;; step was longer than the body being swept.
+;;
+;; So the memory is offered only while it still suits this vehicle. The test is
+;; the one that actually matters: a step at or beyond the shortest body length
+;; guarantees gaps in the envelope.
+(defun wiki-turn-default-step (vehicle / body computed)
+  (setq
+    computed (/ (wiki-turn-seg-get (car vehicle) "wheelbase") 10.0)
+    body (wiki-turn-shortest-body vehicle)
   )
-  (SETQ
-    CURRENTVALUE
-     (COND
-       ((GETDIST
-          STARTINGPOINT
-          (STRCAT
-            PROMPTSTRING
-            " <"
-            (RTOS CURRENTVALUE)
-            ">: "
+  (cond
+    ((null *wiki-turn-calculationstep*) computed)
+    ((and body (>= *wiki-turn-calculationstep* body))
+     (princ
+       (strcat "\nTURN: the remembered step " (rtos *wiki-turn-calculationstep* 2 2)
+               " is longer than this rig's shortest body ("
+               (rtos body 2 2) ")."
+               "\n      Offering " (rtos computed 2 2) " instead.")
+     )
+     computed
+    )
+    (*wiki-turn-calculationstep*)
+  )
+)
+
+(defun wiki-turn-getdistx (basept prompt default / input)
+  (setq input (getdist basept (strcat prompt " <" (rtos default) ">: ")))
+  (if input (setq default input))
+  default
+)
+
+(defun wiki-turn-getintx (prompt default / input)
+  (setq input (getint (strcat prompt " <" (itoa default) ">: ")))
+  (if input (setq default input))
+  default
+)
+
+;;; ---------------------------------------------------------------------------
+;;; TURN
+;;; ---------------------------------------------------------------------------
+(defun c:turn (/ atts course en-vehicle es-course heading-0 pick step vehicle)
+  (wiki-turn-read-layers-dat)
+  (setq en-vehicle (car (entsel "\nSelect vehicle block: ")))
+  (cond
+    ((or (null en-vehicle) (/= "INSERT" (cdr (assoc 0 (entget en-vehicle)))))
+     (wiki-turn-alert "That is not a vehicle block.\n\nRun BUILDVEHICLE (BV) to define a vehicle.")
+    )
+    ((null (setq atts (wiki-turn-block-attributes en-vehicle)))
+     (wiki-turn-alert "That block carries no vehicle dimensions.\n\nRun BUILDVEHICLE (BV) to define a vehicle.")
+    )
+    (t
+     (setq
+       vehicle (wiki-turn-vehicle-from-attributes atts)
+       heading-0 (+ pi (cdr (assoc 50 (entget en-vehicle))))
+       es-course (entsel "\nSelect the course to follow, near the end travel starts: ")
+     )
+     (cond
+       ((null es-course) (princ "\nNothing selected."))
+       ((not (wiki-turn-curve-p (car es-course)))
+        (alert
+          (princ
+            (strcat
+              "\nThat object cannot be followed as a course."
+              "\n\nPick the path polyline, not the vehicle block. The block sits"
+              "\non top of the start of the path, so zoom in and pick a part of"
+              "\nthe path that is clear of the vehicle."
+            )
           )
         )
        )
-       (T CURRENTVALUE)
-     )
-  )
-)
-;;; Added 2008-04-10 by Tom Haws for vehicle plotting frequency prompt.
-;;; GETINTX
-;;; Copyright Thomas Gail Haws 2006
-;;; Get a distance providing the current value or a vanilla default.
-;;; Usage: (getdistx startingpoint promptstring currentvalue vanilladefault)
-(DEFUN
-   GETINTX (PROMPTSTRING CURRENTVALUE VANILLADEFAULT)
-  (SETQ
-    CURRENTVALUE
-     (COND
-       (CURRENTVALUE)
-       (VANILLADEFAULT)
-       (0)
-     )
-  )
-  (SETQ
-    CURRENTVALUE
-     (COND
-       ((GETINT
-          (STRCAT
-            PROMPTSTRING
-            " <"
-            (ITOA CURRENTVALUE)
-            ">: "
+       (t
+        (setq
+          pick (cadr es-course)
+          step
+           (wiki-turn-getdistx
+             pick
+             "\nCalculation step distance along the course"
+             (wiki-turn-default-step vehicle)
+           )
+          *wiki-turn-calculationstep* step
+          *wiki-turn-plotfrequency*
+           (wiki-turn-getintx "\nCalculation steps to skip between vehicle plots" *wiki-turn-plotfrequency*)
+          course (wiki-turn-course-from-curve (car es-course) pick step)
+        )
+        (cond
+          ((< (length course) 2) (princ "\nThe course is too short to track."))
+          (t
+           (command "._undo" "_begin")
+           (wiki-turn-run vehicle course heading-0 *wiki-turn-plotfrequency*)
+           (command "._undo" "_end")
           )
         )
        )
-       (T CURRENTVALUE)
      )
+    )
+  )
+  (princ)
+)
+
+;;; ---------------------------------------------------------------------------
+;;; BUILDVEHICLE
+;;; ---------------------------------------------------------------------------
+(defun wiki-turn-make-attribute (inspoint rotation tag value prompt height layer)
+  (entmake
+    (list
+      '(0 . "ATTDEF")
+      (cons 8 layer)
+      (cons 10 inspoint)
+      (cons 40 height)
+      (cons 1 value)
+      (cons 3 prompt)
+      (cons 2 tag)
+      '(70 . 0)
+      (cons 50 rotation)
+    )
+  )
+  (entlast)
+)
+
+;; A rectangle centred on the segment axis, from x0 to x1, `width` across.
+(defun wiki-turn-make-box (x0 x1 y width layer / half)
+  (setq half (/ width 2.0))
+  (wiki-turn-draw-pline
+    (list
+      (list x0 (- y half)) (list x1 (- y half))
+      (list x1 (+ y half)) (list x0 (+ y half))
+    )
+    layer
+    T
+  )
+  (entlast)
+)
+
+;;; ---------------------------------------------------------------------------
+;;; Turning a vehicle into block attributes
+;;; ---------------------------------------------------------------------------
+;; The attribute (tag value) pairs one segment contributes. Pure.
+;; front-hang is written the way 1.1.x wrote it: forward-positive on the
+;; powered unit, backward-positive on a trailer. The model uses one
+;; forward-positive convention internally, so trailers are un-negated here.
+(defun wiki-turn-segment-attributes (index segment / atts hitch)
+  (setq
+    hitch (wiki-turn-seg-get segment "hitch")
+    atts
+     (list
+       (list (wiki-turn-tag index "name") (wiki-turn-seg-get segment "name"))
+       (list (wiki-turn-tag index "body-length") (rtos (wiki-turn-seg-get segment "body-length") 2))
+       (list (wiki-turn-tag index "body-width") (rtos (wiki-turn-seg-get segment "body-width") 2))
+       (list
+         (wiki-turn-tag index "front-hang")
+         (rtos
+           (if (zerop index)
+             (wiki-turn-seg-get segment "front-hang")
+             (- (wiki-turn-seg-get segment "front-hang"))
+           )
+           2
+         )
+       )
+       (list (wiki-turn-tag index "wheelbase") (rtos (wiki-turn-seg-get segment "wheelbase") 2))
+       (list (wiki-turn-tag index "axle-width") (rtos (wiki-turn-seg-get segment "axle-width") 2))
+       (list (wiki-turn-tag index "art-angle") (angtos (wiki-turn-seg-get segment "art-angle") 0 4))
+       (list (wiki-turn-have-tag index) (if hitch "Yes" "No"))
+     )
+  )
+  (if (zerop index)
+    (setq
+      atts
+       (append
+         atts
+         (list (list (wiki-turn-tag index "steer-lock")
+                     (angtos (wiki-turn-seg-get segment "steer-lock") 0 4)
+               )
+         )
+       )
+    )
+  )
+  (if hitch
+    (setq atts (append atts (list (list (wiki-turn-tag index "hitch") (rtos hitch 2)))))
+  )
+  atts
+)
+
+;; Draw the vehicle block. NO PROMPTS - the caller supplies the whole vehicle.
+;; base is the middle of the front bumper. The body runs off in +X and TURN
+;; reads the heading back as (block rotation + pi), exactly as 1.1.x did, so
+;; every vehicle block ever built still reads correctly.
+(defun wiki-turn-build-block (base vehicle / a atts axle-x guide-x hitch-x index name
+                              row segment side ss text-height trail-x wheel-len
+                              wheel-wid x0 x1
+                             )
+  (wiki-turn-read-layers-dat)
+  (setq
+    index 0
+    hitch-x 0.0
+    ss (ssadd)
+  )
+  (foreach segment vehicle
+    (wiki-turn-make-segment-layers index)
+    (setq
+      atts (wiki-turn-segment-attributes index segment)
+      guide-x (if (zerop index) (wiki-turn-seg-get segment "front-hang") hitch-x)
+      trail-x (+ guide-x (wiki-turn-seg-get segment "wheelbase"))
+      x0 (- guide-x (wiki-turn-seg-get segment "front-hang"))
+      x1 (+ x0 (wiki-turn-seg-get segment "body-length"))
+      text-height (/ (wiki-turn-seg-get segment "body-width") 15.0)
+      wheel-len (/ (wiki-turn-seg-get segment "body-length") 10.0)
+      wheel-wid (/ (wiki-turn-seg-get segment "body-width") 10.0)
+    )
+    (ssadd
+      (wiki-turn-make-box
+        (+ (car base) x0)
+        (+ (car base) x1)
+        (cadr base)
+        (wiki-turn-seg-get segment "body-width")
+        (wiki-turn-layer index "BODY")
+      )
+      ss
+    )
+    (foreach axle-x (if (zerop index) (list guide-x trail-x) (list trail-x))
+      (foreach side (list -1.0 1.0)
+        (ssadd
+          (wiki-turn-make-box
+            (+ (car base) axle-x (- (/ wheel-len 2.0)))
+            (+ (car base) axle-x (/ wheel-len 2.0))
+            (+ (cadr base) (* side (/ (wiki-turn-seg-get segment "axle-width") 2.0)))
+            wheel-wid
+            (wiki-turn-layer index "BODY")
+          )
+          ss
+        )
+      )
+    )
+    (setq row 0)
+    (foreach a atts
+      (ssadd
+        (wiki-turn-make-attribute
+          (list
+            (+ (car base) x0 text-height)
+            (- (cadr base) (* text-height (- (* 1.5 row) 3.0)))
+          )
+          0.0
+          (car a)
+          (cadr a)
+          (car a)
+          text-height
+          (wiki-turn-layer index "BODY")
+        )
+        ss
+      )
+      (setq row (1+ row))
+    )
+    (setq
+      hitch-x
+       (if (wiki-turn-seg-get segment "hitch")
+         (+ trail-x (wiki-turn-seg-get segment "hitch"))
+         nil
+       )
+      index (1+ index)
+    )
+  )
+  (setq name (wiki-turn-seg-get (car vehicle) "name"))
+  (command "._-block" (strcat "VEHICLELIB" name) base ss "")
+  (command "._-insert" (strcat "VEHICLELIB" name) base "" "" "")
+  (entlast)
+)
+
+;;; ---------------------------------------------------------------------------
+;;; The prompting shell
+;;; ---------------------------------------------------------------------------
+;;; ---------------------------------------------------------------------------
+;;; Asking a person for dimensions
+;;; ---------------------------------------------------------------------------
+;;; Rules learned from watching a real user get every one of these wrong:
+;;;
+;;;   - Ask for what is measured, not half of it. "Half width" made the doubling
+;;;     invisible, so a wrong answer looked right.
+;;;   - Name BOTH ends of every measurement. "Rear axle to hitch" and "hitch to
+;;;     trailer axle" are adjacent links in a chain; a user who cannot see that
+;;;     answers the same number twice.
+;;;   - Put the sign in the question, not in a parenthetical. Ask which way the
+;;;     thing sticks out and take the common direction as positive.
+;;;   - Offer a default for anything that usually has one. The commonest answer
+;;;     should be the cheapest to give.
+
+;; A required distance. initget 1 refuses an empty answer, so there is no way to
+;; fall through with nil and corrupt the arithmetic later.
+(defun wiki-turn-ask-dist (prompt)
+  (initget 1)
+  (getdist (strcat "\n" prompt ": "))
+)
+
+;; A distance with a default. Enter takes the default.
+(defun wiki-turn-ask-dist-default (prompt default / v)
+  (setq v (getdist (strcat "\n" prompt " <" (rtos default 2 2) ">: ")))
+  (cond (v) (default))
+)
+
+(defun wiki-turn-ask-angle-default (prompt degrees / v)
+  (setq v (getangle (strcat "\n" prompt " <" (rtos degrees 2 0) " degrees>: ")))
+  (cond (v) ((* pi (/ degrees 180.0))))
+)
+
+(defun wiki-turn-ask-name (prompt default / v)
+  (setq v (getstring t (strcat "\n" prompt " <" default ">: ")))
+  (if (= v "") default v)
+)
+
+;; Prompt for one segment. index 0 is the powered unit. Returns a segment.
+(defun wiki-turn-prompt-segment (index / art axle-width body-length body-width
+                                 front-hang hitch name steer-lock tows wheelbase
+                                )
+  (princ
+    (strcat "\n\n--- "
+            (if (zerop index) "Powered unit" (strcat "Trailer " (itoa index)))
+            " ---")
+  )
+  (cond
+    ((zerop index)
+     (setq
+       name (wiki-turn-ask-name "Name for this vehicle" "Truck")
+       body-length (wiki-turn-ask-dist "Overall length of the tractor body")
+       body-width (wiki-turn-ask-dist "Overall width of the tractor body, outside to outside")
+       front-hang (wiki-turn-ask-dist "Front overhang, front bumper back to the steering axle")
+       wheelbase
+        (wiki-turn-ask-dist
+          "Wheelbase, steering axle back to the rear axle (use the centroid if there are several)"
+        )
+       axle-width (wiki-turn-ask-dist "Track width, centre of one tire to centre of the other")
+       steer-lock (wiki-turn-ask-angle-default "Maximum steering lock angle" 30.0)
+     )
+    )
+    (t
+     (setq
+       name (wiki-turn-ask-name "Name for this trailer" (strcat "Trailer" (itoa index)))
+       wheelbase
+        (wiki-turn-ask-dist
+          "Hitch back to THIS trailer's axle - the trailer's own wheelbase"
+        )
+       axle-width (wiki-turn-ask-dist "Track width, centre of one tire to centre of the other")
+       ;; Asked forward-positive, which is the common case for a semitrailer,
+       ;; so the usual answer needs no minus sign.
+       front-hang
+        (wiki-turn-ask-dist-default
+          "How far the trailer nose reaches FORWARD of the hitch (0 if it starts at the hitch)"
+          0.0
+        )
+       body-length (wiki-turn-ask-dist "Overall length of the trailer body")
+       body-width (wiki-turn-ask-dist "Overall width of the trailer body, outside to outside")
+       steer-lock 0.0
+     )
+    )
+  )
+  (initget 1 "Yes No")
+  (setq tows (getkword (strcat "\nDoes " name " tow another trailer? [Yes/No]: ")))
+  (cond
+    ((= tows "Yes")
+     (setq
+       hitch
+        (wiki-turn-ask-dist-default
+          (strcat
+            "How far BEHIND " name "'s rear axle its hitch sits"
+            "\n  (0 for a fifth wheel over the axle; negative if ahead of it)"
+          )
+          0.0
+        )
+       art (wiki-turn-ask-angle-default "Maximum articulation angle at that hitch" 70.0)
+     )
+    )
+    (t (setq hitch nil art 0.0))
+  )
+  (wiki-turn-segment
+    name wheelbase axle-width body-length body-width front-hang hitch steer-lock art
   )
 )
 
-(DEFUN
-   GETSTRINGX (GX-PROMPT GX-CURRENTVALUE GX-DEFAULTVALUE / GX-INPUT)
-  (SETQ
-    GX-CURRENTVALUE
-     (COND
-       (GX-CURRENTVALUE)
-       (GX-DEFAULTVALUE)
-       ("")
-     )
+;;; ---------------------------------------------------------------------------
+;;; Telling the person what they just described
+;;; ---------------------------------------------------------------------------
+;;; A user cannot check a number they never see again. These give back the two
+;;; figures that catch a mistake: how long the rig came out, and how tight a
+;;; turn it can make.
+
+;; Bumper to the back of the last body. Mirrors the layout wiki-turn-build-block
+;; uses, so it is the length that will actually be drawn.
+(defun wiki-turn-overall-length (vehicle / guide-x hitch-x index segment tail trail-x x0 x1)
+  (setq index 0 hitch-x 0.0 tail 0.0)
+  (foreach segment vehicle
+    (setq
+      guide-x (if (zerop index) (wiki-turn-seg-get segment "front-hang") hitch-x)
+      trail-x (+ guide-x (wiki-turn-seg-get segment "wheelbase"))
+      x0 (- guide-x (wiki-turn-seg-get segment "front-hang"))
+      x1 (+ x0 (wiki-turn-seg-get segment "body-length"))
+    )
+    (if (> x1 tail) (setq tail x1))
+    (if (wiki-turn-seg-get segment "hitch")
+      (setq hitch-x (+ trail-x (wiki-turn-seg-get segment "hitch")))
+    )
+    (setq index (1+ index))
   )
-  (SETQ
-    GX-INPUT
-     (GETSTRING
-       (STRCAT "\n" GX-PROMPT " <" GX-CURRENTVALUE ">: ")
-     )
-  )
-  (COND
-    ((= GX-INPUT "") GX-CURRENTVALUE)
-    ((= GX-INPUT ".") "")
-    (T GX-INPUT)
+  tail
+)
+
+;; The tightest circle the steering axle can describe. For a bicycle model,
+;; sin(steer) = wheelbase / radius. nil when no real steering lock is known -
+;; and 0 is not a real steering lock, it is the placeholder the old vehicle
+;; library is full of.
+(defun wiki-turn-min-radius (segment / lock)
+  (setq lock (wiki-turn-seg-get segment "steer-lock"))
+  (if (and lock (< 0.0001 lock) (< lock (/ pi 2)))
+    (/ (wiki-turn-seg-get segment "wheelbase") (sin lock))
   )
 )
 
-(DEFUN TURN-ASIN (X) (/ X (SQRT (- 1 (* X X)))))
-(DEFUN TURN-TAN (THETA) (/ (SIN THETA) (COS THETA)))
+;; How far the guide axle actually travelled, summed along the lead segment's
+;; path. Deliberately not the course object's own length: the path is what was
+;; walked, and it is what the trailer had to respond to.
+(defun wiki-turn-course-length (states / previous total)
+  (setq total 0.0)
+  (foreach s states
+    (if previous (setq total (+ total (distance previous (wiki-turn-guide s)))))
+    (setq previous (wiki-turn-guide s))
+  )
+  total
+)
 
-;;Instructions on load-up added 2008-04-10 by Tom Haws
-(PRINC
-  (STRCAT
-    "\nTURN.LSP version "
-    (TURN-GETVAR "General.Version")
-    " loaded.  Type TURN to start."
+;; Front axle to the last axle in the train: every segment's wheelbase, plus
+;; each hitch offset that carries you on to the next segment. "hitch" is nil on
+;; the last segment, which is what ends the sum.
+(defun wiki-turn-rig-wheelbase (vehicle / hitch total)
+  (setq total 0.0)
+  (foreach segment vehicle
+    (setq total (+ total (wiki-turn-seg-get segment "wheelbase")))
+    (if (setq hitch (wiki-turn-seg-get segment "hitch"))
+      (setq total (+ total hitch))
+    )
+  )
+  total
+)
+
+(defun wiki-turn-describe (vehicle / index radius segment)
+  (princ "\n")
+  (setq index 0)
+  (foreach segment vehicle
+    (princ
+      (strcat "\n  " (if (zerop index) "Tractor" (strcat "Trailer " (itoa index)))
+              " \"" (wiki-turn-seg-get segment "name") "\""
+              "  body " (rtos (wiki-turn-seg-get segment "body-length") 2 2)
+              " x " (rtos (wiki-turn-seg-get segment "body-width") 2 2)
+              ",  wheelbase " (rtos (wiki-turn-seg-get segment "wheelbase") 2 2))
+    )
+    (setq index (1+ index))
+  )
+  (princ (strcat "\n  Overall length, bumper to tail: "
+                 (rtos (wiki-turn-overall-length vehicle) 2 2)))
+  (setq radius (wiki-turn-min-radius (car vehicle)))
+  (princ
+    (if radius
+      (strcat "\n  Tightest turn this vehicle can make: "
+              (rtos radius 2 2) " radius at the steering axle")
+      "\n  Tightest turn: unknown, because no steering lock angle was given"
+    )
+  )
+  (princ)
+)
+
+(defun c:bv () (c:buildvehicle))
+
+(defun c:buildvehicle (/ base index keys mode oldexpert segment vehicle)
+  (setq keys (wiki-turn-library-keys))
+  (initget "Library New ?")
+  (setq
+    mode
+     (cond
+       ((not keys) "New")
+       ((getkword
+          (strcat "\nVehicle source [Library/New/?] <"
+                  (if keys "Library" "New") ">: ")))
+       (keys "Library")
+       ("New")
+     )
+  )
+  (if (= mode "?")
+    (progn
+      (wiki-turn-alert
+        (strcat "Library: pick a standard vehicle from turn-vehicles.dat.\n"
+                "New: answer prompts and define one yourself.\n\n"
+                (itoa (length keys)) " vehicles are in the library:\n"
+                (wiki-turn-key-columns keys))
+      )
+      (setq mode "Library")
+    )
+  )
+  (setq
+    base (getpoint "\nLocation to build vehicle (middle of the front bumper): ")
+    index 0
+  )
+  (if (= mode "Library")
+    (setq vehicle (wiki-turn-prompt-library-vehicle keys))
+  )
+  (if vehicle
+    (progn
+      (setq oldexpert (getvar "expert"))
+      (setvar "expert" 5)
+      (wiki-turn-build-block base vehicle)
+      (setvar "expert" oldexpert)
+      (princ
+        (strcat "\n\nVehicle \"" (wiki-turn-seg-get (car vehicle) "name") "\" placed, "
+                (itoa (length vehicle)) " segment(s), as block "
+                "VEHICLELIB" (wiki-turn-seg-get (car vehicle) "name") ".")
+      )
+      (wiki-turn-describe vehicle)
+      (princ
+        (strcat "\n\nMove it so the middle of the steering axle sits on the start of"
+                "\nyour course, rotate it to the starting direction, then run TURN.")
+      )
+      (princ)
+    )
+    (c:buildvehicle-new base)
   )
 )
-(PRINC)
- ;|«Visual LISP© Format Options»
-(72 2 40 2 nil "end of " 60 2 2 2 1 nil nil nil T)
-;*** DO NOT add text below the comment! ***|;
+
+;; Lay a list of keys out in columns so an alert stays readable.
+(defun wiki-turn-key-columns (keys / i out)
+  (setq i 0 out "")
+  (foreach k keys
+    (setq
+      out (strcat out (if (zerop (rem i 4)) "\n  " "  ") k)
+      i (1+ i)
+    )
+  )
+  out
+)
+
+;; The keyword string initget wants: the keys, space delimited.
+;;
+;; Hyphens are safe here. Probed in AutoCAD rather than assumed, because the
+;; keys are WB-67 and S-BUS-36 and the manual says nothing about hyphens:
+;; initget accepts the list, getkword matches case-insensitively and returns the
+;; key verbatim, and empty input returns nil so the caller can default.
+;; See devtools/turn-probe-initget.
+(defun wiki-turn-keyword-string (keys / out)
+  (setq out "")
+  (foreach k keys (setq out (strcat out k " ")))
+  (vl-string-trim " " out)
+)
+
+;; The name INSUNITS is currently claiming, or nil when it claims nothing.
+(defun wiki-turn-insunits-name (/ code)
+  (setq code (getvar "insunits"))
+  (cdr (assoc code '((1 . "Inches") (2 . "Feet") (3 . "Miles") (4 . "Millimeters")
+                     (5 . "Centimeters") (6 . "Meters") (7 . "Kilometers")
+                     (10 . "Yards"))))
+)
+
+;; State the units and the scale, every time, before anything is drawn.
+;;
+;; TURN follows INSUNITS; it does not argue with it. But an architect works in
+;; inches and a civil engineer in feet, both legitimately, and the stock
+;; acad.dwt declares inches - so a civil drawing that was never set up will
+;; scale a library vehicle by twelve and look broken. Saying the numbers out
+;; loud costs one line and turns a mystery into an obvious setting to fix.
+(defun wiki-turn-report-units (key / drawing factor library)
+  (setq
+    library (wiki-turn-units-name (wiki-turn-library-units key))
+    drawing (wiki-turn-insunits-name)
+    factor (wiki-turn-library-scale (wiki-turn-library-units key))
+  )
+  (princ (strcat "\nTURN: library records " key " in " library "."))
+  (cond
+    ((null drawing)
+     (princ (strcat "\n      This drawing does not declare its units (INSUNITS is 0),"
+                    "\n      so " key " is used unscaled, as " library "."))
+    )
+    (t
+     (princ (strcat "\n      INSUNITS says this drawing is in " drawing
+                    ", so scaling by " (rtos factor 2 4) "."))
+     (if (not (equal factor 1.0 1e-9))
+       (princ (strcat "\n      If that is wrong, the drawing's INSUNITS is wrong."
+                      " Set it and run again."))
+     )
+    )
+  )
+  factor
+)
+
+;; The tidy name for a units string out of the data file.
+(defun wiki-turn-units-name (units / m)
+  (setq m (wiki-turn-units-metres units))
+  (cond ((null m) units)
+        ((equal m 0.3048 1e-9) "Feet")
+        ((equal m 0.0254 1e-9) "Inches")
+        ((equal m 1.0 1e-9) "Meters")
+        ((equal m 0.001 1e-9) "Millimeters")
+        ((equal m 0.01 1e-9) "Centimeters")
+        (units)
+  )
+)
+
+(defun wiki-turn-prompt-library-vehicle (keys / key vehicle)
+  (princ (strcat "\nLibrary vehicles:" (wiki-turn-key-columns keys)))
+  ;; getkword, not getstring: it validates against the library, accepts any
+  ;; case, and will not let a typo through to an alert.
+  (initget (wiki-turn-keyword-string keys))
+  (setq key (getkword (strcat "\nVehicle key <" (car keys) ">: ")))
+  (if (null key) (setq key (car keys)))
+  (wiki-turn-report-units key)
+  (cond
+    ((setq vehicle (wiki-turn-library-vehicle-scaled key))
+     (princ (strcat "\n" key ": " (wiki-turn-library-description key)
+                    " (" (wiki-turn-library-units key) ", "
+                    (itoa (length vehicle)) " segments)"))
+     vehicle
+    )
+    (t
+     (wiki-turn-alert (strcat "No vehicle called \"" key "\" is in the library."))
+     nil
+    )
+  )
+)
+
+(defun c:buildvehicle-new (base / index oldexpert segment vehicle)
+  (setq index 0)
+  (while
+    (progn
+      (setq
+        segment (wiki-turn-prompt-segment index)
+        vehicle (append vehicle (list segment))
+        index (1+ index)
+      )
+      (and (wiki-turn-seg-get segment "hitch") (< index 12))
+    )
+  )
+  ;; Redefining an existing block would otherwise raise a dialog.
+  (setq oldexpert (getvar "expert"))
+  (setvar "expert" 5)
+  (wiki-turn-build-block base vehicle)
+  (setvar "expert" oldexpert)
+  (princ
+    (strcat
+      "\n\nVehicle \"" (wiki-turn-seg-get (car vehicle) "name") "\" built, "
+      (itoa (length vehicle)) " segment(s), as block "
+      ;; Say the real block name. The VEHICLELIB prefix is added silently, and a
+      ;; user who never sees it cannot find their own block.
+      "VEHICLELIB" (wiki-turn-seg-get (car vehicle) "name") "."
+    )
+  )
+  (wiki-turn-describe vehicle)
+  (princ
+    (strcat
+      "\n\nCheck those figures before you go on."
+      "\nThen move the block so the middle of the steering axle sits on the start"
+      "\nof your course, rotate it to the starting direction, and run TURN."
+    )
+  )
+  (princ)
+)
+
+
+(princ (strcat "\nTURN " (wiki-turn-getvar "general.version") " loaded. Type TURN or BV."))
+(princ)

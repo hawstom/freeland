@@ -1,0 +1,102 @@
+;TURN.LSP vehicle library
+;
+;TURN-VEHICLES.DAT
+;
+;Put this file anywhere on your AutoCAD support file search path.
+;TURN finds it with (findfile). It is optional - without it you build
+;vehicles by hand with BUILDVEHICLE.
+;
+;Format, one record per line:
+;
+;  ("VEHICLE" "KEY" "Description" "UNITS")
+;  ("SEGMENT" "Name" wheelbase axle-width body-length body-width
+;             front-hang hitch steer-lock art-angle)
+;
+;SEGMENT records belong to the VEHICLE record above them, powered unit
+;first. hitch is nil on the last segment. Angles are in DEGREES.
+;front-hang is measured FORWARD from the guide point, so it is negative
+;on a trailer whose body begins behind the hitch eye.
+;
+;PROVENANCE: extracted by devtools/turn-extract-vehicles from the
+;attributed blocks in "Vehicle Library", which were built with
+;BUILDVEHICLE 1.1.7.1. They are only as good as those drawings.
+;
+;CAUTION - STEERING LOCK AND ARTICULATION ANGLE ARE MISSING, NOT ZERO.
+;BUILDVEHICLE 1.1.x never asked for either one. It hardcoded 0.5 radians
+;and wrote it out as 28.6479 degrees, so every source drawing carries
+;that same fake number. It has been replaced with 0 here, because a
+;placeholder that looks like data is worse than no data: TURN would
+;otherwise report -steering lock exceeded, vehicle has 28.6- with total
+;confidence and no basis whatever.
+;
+;A limit of 0 tells TURN not to check. Supply real values from the
+;manufacturer or the governing standard before relying on the
+;steering-lock and jackknife warnings for these vehicles.
+;
+;CAUTION - WHEELBASES DISAGREE WITH THE OLD REFERENCE TABLE IN TURN.LSP.
+;That table lists WB-40 as WB1 13 / WB2 27 and WB-50 as WB1 20 / WB2 30.
+;These drawings say 12.5 / 25.5 and 12.5 / 35.5. The drawings are the
+;newer source and are what shipped as the vehicle library, so they are
+;what is recorded here. The discrepancy has not been resolved - check
+;against your own governing standard before use.
+;
+
+("VEHICLE" "A-BUS" "A-BUS" "ft")
+("SEGMENT" "A-BUS" 22.0000 8.5000 34.8000 8.5000 8.6000 6.2000 0 0)
+("SEGMENT" "A-BUS" 13.2000 8.5000 21.2000 8.5000 -2.0000 nil 0.00 0.00)
+
+("VEHICLE" "BUS-40" "BUS-40" "ft")
+("SEGMENT" "BUS-40" 25.8500 8.5000 40.0000 8.5000 6.0000 nil 0 0.00)
+
+("VEHICLE" "BUS-45" "BUS-45" "ft")
+("SEGMENT" "BUS-45" 28.5000 8.5000 45.0000 8.5000 6.0000 nil 0 0.00)
+
+("VEHICLE" "CITY-BUS" "CITY-BUS" "ft")
+("SEGMENT" "CITY-BUS" 25.0000 8.5000 40.0000 8.5000 7.0000 nil 0 0.00)
+
+("VEHICLE" "MH" "MH" "ft")
+("SEGMENT" "MH" 20.0000 8.0000 30.0000 8.0000 4.0000 nil 0 0.00)
+
+("VEHICLE" "MHB" "MHB" "ft")
+("SEGMENT" "MHB" 20.0000 8.0000 30.0000 8.0000 4.0000 6.0000 0 0)
+("SEGMENT" "MHB" 15.0000 8.0000 20.0000 8.0000 -3.0000 nil 0.00 0.00)
+
+("VEHICLE" "P" "P" "ft")
+("SEGMENT" "P" 11.0000 6.0000 19.0000 7.0000 3.0000 nil 0 0.00)
+
+("VEHICLE" "PB" "PB" "ft")
+("SEGMENT" "PB" 11.0000 6.0000 19.0000 7.0000 3.0000 5.0000 0 0)
+("SEGMENT" "PB" 15.0000 8.0000 20.0000 8.0000 -3.0000 nil 0.00 0.00)
+
+("VEHICLE" "PT" "PT" "ft")
+("SEGMENT" "PT" 11.0000 6.0000 19.0000 7.0000 3.0000 5.0000 0 0)
+("SEGMENT" "PT" 17.7000 8.0000 27.0000 8.0000 -2.7000 nil 0.00 0.00)
+
+("VEHICLE" "S-BUS-36" "S-BUS-36" "ft")
+("SEGMENT" "S-BUS-36" 21.3000 8.0000 35.8000 8.0000 2.5000 nil 0 0.00)
+
+("VEHICLE" "S-BUS-40" "S-BUS-40" "ft")
+("SEGMENT" "S-BUS-40" 20.0000 8.0000 40.0000 8.0000 7.0000 nil 0 0.00)
+
+("VEHICLE" "SU" "SU" "ft")
+("SEGMENT" "SU" 20.0000 8.0000 30.0000 8.0000 4.0000 nil 0 0.00)
+
+("VEHICLE" "WB-40" "WB-40" "ft")
+("SEGMENT" "WB-40" 12.5000 8.0000 17.8300 8.0000 3.0000 0.0000 0 0)
+("SEGMENT" "WB-40" 25.5000 8.0000 33.0000 8.0000 3.0000 nil 0.00 0.00)
+
+("VEHICLE" "WB-50" "WB-50" "ft")
+("SEGMENT" "WB-50" 12.5000 8.0000 19.9200 8.0000 3.0000 0.0000 0 0)
+("SEGMENT" "WB-50" 35.5000 8.5000 42.5000 8.5000 3.0000 nil 0.00 0.00)
+
+("VEHICLE" "WB-62" "WB-62" "ft")
+("SEGMENT" "WB-62" 19.5000 8.0000 27.7000 8.0000 4.0000 0.0000 0 0)
+("SEGMENT" "WB-62" 40.5000 8.5000 48.0000 8.5000 3.0000 nil 0.00 0.00)
+
+("VEHICLE" "WB-65" "WB-65" "ft")
+("SEGMENT" "WB-65" 19.5000 8.0000 27.9200 8.0000 4.0000 0.0000 0 0)
+("SEGMENT" "WB-65" 43.5000 8.5000 53.0000 8.5000 3.0000 nil 0.00 0.00)
+
+("VEHICLE" "WB-67" "WB-67" "ft")
+("SEGMENT" "WB-67" 19.5000 8.0000 27.9200 8.0000 4.0000 0.0000 0 0)
+("SEGMENT" "WB-67" 45.5000 8.5000 53.0000 8.5000 3.0000 nil 0.00 0.00)
