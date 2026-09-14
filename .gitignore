@@ -1,0 +1,30 @@
+# FreeLand
+
+# --- Never commit: other people's drawings and correspondence ---------------
+# user_help/ holds files sent to us by users seeking support, plus draft
+# replies to them. Those files are theirs, not ours, and their names are in
+# them. They are kept here because that is where the work happens; they must
+# not reach github.com/hawstom/freeland.
+#
+# This rule is adequate, not a lock. `git add -f` still overrides it, and it
+# does nothing about zips or backups of the working tree.
+Turning_Path_Tracker/user_help/
+
+# --- Never commit: the website working copy --------------------------------
+# hawsedc.com/ is a clone of github.com/hawstom/hawsedc.com, nested here for
+# convenience because TURN's released files live in its gnu/ directory. It has
+# its own history and its own remote. Without this rule git offers to commit it
+# as a gitlink, which would be wrong in both repos.
+Turning_Path_Tracker/hawsedc.com/
+
+# --- Build and test output -------------------------------------------------
+# Produced by a run, not authored. Regenerate it; do not track it.
+Turning_Path_Tracker/devtools/turn-integration-out.dwg
+
+# --- AutoCAD litter --------------------------------------------------------
+*.bak
+*.dwl
+*.dwl2
+*.err
+*.sv$
+*.ac$
