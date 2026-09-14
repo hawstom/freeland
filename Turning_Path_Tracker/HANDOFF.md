@@ -1,122 +1,136 @@
-# Handoff — Turning Path Tracker, 2026-09-13 (second session)
+# Handoff — Turning Path Tracker, 2026-09-14
 
-Read `CLAUDE.md` first for the durable facts. This file is the perishable part.
+`CLAUDE.md` holds the durable facts. This file is the perishable part: what just
+happened, and what Tom is about to test.
 
-The previous handoff said *"The freeland repo itself is uncommitted, and that is
-deliberate."* **That was wrong, twice over.** It was not deliberate, it was
-"don't commit unless asked" applied without ever asking; and the repo was not
-uncommitted — it has 15 commits going back to 2017, and the snapshots were all in
-them. Tom's standing instruction, given this session:
+## State in one paragraph
 
-> **"Commit and push prudently and parsimoniously, of course."**
+**The trunk is 2.1.0-dev and it is NOT published.** `hawsedc.com/gnu/` still serves
+2.0.0, untouched, and `turn-release.py` refuses to publish anything whose version
+carries a `-suffix`, so a work in progress cannot overwrite a good release. Everything
+is committed and pushed on `main`. The punch list is closed. The whole test matrix is
+green: **154 kernel, 55 punch list, 44 end to end, 30 curve, 7 release smoke**, on
+Civil 3D 2026 and AutoCAD 2027, no errors, no leftover processes.
 
-That is now the rule. It supersedes the old note. Do not re-invent the ban.
+**What is waiting for you is hands on the wheel: `DRIVE`.**
 
-## What this session did — a directional cleanup, no program changes
+---
 
-`turn.lsp` was not touched. Everything below is structure, tooling and docs.
+## Testing DRIVE
 
-1. **One True Copy, applied.** Twenty-two concurrent `turn*.lsp` snapshots deleted
-   (recoverable: `git show cafd98a:Turning_Path_Tracker/<name>`). `src/` — an
-   invention of the last session to avoid dealing with the attic — flattened away.
-   The program is `Turning_Path_Tracker/turn.lsp`, flat at the folder top like
-   every other FreeLand tool.
-2. **The shipped copy is now an artifact, not a second source.**
-   `devtools/turn-release.py` publishes trunk → `gnu/turn-<version>.lsp`, reads the
-   version out of the file, and refuses to proceed silently when the published copy
-   has drifted. **On its first run it found drift the hand-copy ritual had missed**
-   — `turn-layers.dat`, line endings only. Fixed by normalising the trunk, so no
-   published file changed.
-3. **The harness has no hardcoded paths and runs on three products.**
-   `turn-tests.bat` sets `TURNDEV` from `%~dp0`; `devtools/turn-dev-paths.lsp` (first
-   line of every `.scr`) derives the rest. 28 files of absolute paths are gone.
-   `turn-tests.bat <script> [c3d|acad|2024] [c3d]`.
-4. **First-ever run on Civil 3D, and on AutoCAD 2027.** 106 kernel, 44 end to end,
-   30 curve, 7 release smoke — passing on Civil 3D 2026, AutoCAD 2027 and AutoCAD 2024.
-5. **Punch list item 7 closed by automating it.** See below.
-6. **A TRUSTEDPATHS leak, found and fixed.** It is saved in the profile, not the
-   session, so appending to it grew the list every run — that is what made Tom's Civil
-   3D trusted locations a mess, and the old release-smoke `.scr` had accumulated seven
-   copies of a path ending in a literal `...`. Paths are now normalised and added only
-   when absent; the affected profiles were cleaned. Verified convergent over three runs.
-7. **`.gitignore` written** at the freeland root — `user_help/`, `hawsedc.com/`,
-   build output, AutoCAD litter. See the warning below.
-8. Docs corrected where they had gone false. A citation in ROADMAP was stale by 158
-   lines; **do not cite line numbers in prose** unless something checks them.
+Load the **trunk**, not the shipped copy:
 
-## The one thing to be careful about
+    (load "C:/TGHFiles/programming/misclisp/freeland/Turning_Path_Tracker/turn.lsp")
 
-`user_help/` holds **other people's drawings and correspondence**, with their names
-in them, and freeland pushes to a public GitHub. It is gitignored. That is adequate,
-not a lock: `git add -f` overrides it and it does nothing about zips or backups.
-Never commit it. Never quote a user's name into a public file.
+Expect: `TURN 2.1.0-dev loaded. Type TURN, DRIVE or BV.`
 
-## Open, and who owns them
+Then:
+
+1. **`BV`** — build a vehicle. A WB-67: body 27.92, width 8, overhang 4, wheelbase
+   19.5, track 8, steering lock 30. Trailer: **Yes**, hitch 0, articulation 70,
+   wheelbase 45.5, track 8.5, nose forward 3, body 53, width 8.5. Then **No**.
+   (Or insert `Vehicle_Library/turn-wb-67.dwg` and use that.)
+2. **`DRIVE`** — pick the block. It asks for the **start point of the front axle
+   centre**, then the calculation step, then plot frequency.
+3. **Move the cursor.** The rig steers toward it, as hard as the steering lock allows,
+   and takes one step forward each time the cursor gets a step ahead of the front axle.
+   Stop moving and it stops. Outlines accumulate as you go, so you watch the swept path
+   build up.
+4. **ENTER or SPACE** to finish. It then draws properly — tire paths, bodies, envelope —
+   and reports, exactly as `TURN` does.
+
+**What only you can judge**, because `grread` waits for a human and a harness is not one:
+
+- Does steering with the cursor feel right, or should the cursor set a *heading* the
+  rig holds rather than a point it chases?
+- Are accumulating `grdraw` outlines what you want to see while driving, or would one
+  rig plus a trailing centreline be better?
+- Is one step per cursor event the right rate?
+- The rig will not reverse. Acceptable for a first cut?
+
+**Escape is safe.** The undo group opens only after the loop ends, so Esc aborts before
+anything reaches the drawing. Leftover outlines clear with `REGEN`.
+
+**Known and deliberate:** the cursor can be somewhere the rig cannot reach — inside its
+own minimum turning circle — and it will then orbit rather than arrive. A WB-67 cannot
+reach a point 40 ft abeam of itself. Driving *until* it arrives was the first version,
+and it hung AutoCAD; one step per event makes termination structural.
+
+---
+
+## What changed since the last handoff
+
+1. **One namespace prefix, `turn-`.** AutoLISP has a single global namespace and
+   provides no namespacing, so we must. Nineteen prefixes became one; 313 functions.
+   Test scaffolding is bound by the rule too — it loads into the same session. `wiki-`
+   is retired except where a doc names a 1.1.17 function.
+2. **`c:drive` and the drive kernel.** `turn-drive-path` returns the same shape as
+   `turn-path`, so the envelope, findings and report work on a driven rig unchanged —
+   proven, not assumed: **0.000000000000 disagreement across 482 states**.
+3. **The punch list is closed**, ten items by automation and items 2 and 3 by your
+   review. Prompts stand; 30/70 defaults stay.
+4. **A release guard.** `-dev` in the version means `turn-release.py` publishes
+   nothing, even with `--publish`.
+
+## Defects found and fixed along the way
+
+- **The harness leaked an AutoCAD process on every run** whose script reached `quit`
+  with a dirty drawing. `quit`+`y` asked for a filename and parked; `quit`+`n` parked
+  too. Leaving the drawing saved is what works.
+- **Every log ended with a spurious `ERROR: Function cancelled`** — from
+  `(command "._quit")` inside LISP. Gone; the `quit` is a script line now.
+- **`TRUSTEDPATHS` grew by three entries every run**, which is what turned your Civil
+  3D trusted locations into a mess. Paths are normalised and added only if absent.
+- **Civil 3D crashes tearing down a COM-created `AECC_ALIGNMENT`.** The curve suite
+  passed all 30 checks, then sat 19 minutes behind a window titled "AutoCAD Error
+  Aborting". Alignments are erased once the assertions are done.
+- **The rename silently broke the release smoke test**, which still printed PASS —
+  once — with its summary line simply absent. It now resolves function names at run
+  time and finds the published file by name.
+
+## Still open, and on whom
 
 ### Tom
-- **The punch list is down to items 2 and 3, and they are the two worth your eye.**
-  Ten of eleven are automated: `turn-punch-tests` (53 checks) and `turn-curve-tests`
-  (30). What remains is whether the BUILDVEHICLE prompts *read* clearly — whether a
-  user can tell the tractor's rear-hitch question from the trailer's kingpin
-  question, which is exactly what Kenya could not do — plus one decision: keep
-  offering 30° steering lock and 70° articulation as defaults, or default to 0 and
-  stay silent rather than stand behind numbers nobody measured. A confident wrong
-  verdict is worse than none, and that call is yours.
+- **Drive it.** Above.
 - **Kenya has not been replied to.** Draft ready and approved in substance:
   `user_help/Kenya_Caldwell/draft-reply-4.md`.
 - **Rob Livingston** was emailed the REGION/UNION envelope approach. No reply yet.
-- **AutoCAD 2027 is done.** `turn-tests.bat <script> acad` drives it, and TURN 2.0.0
-  passes 106 kernel and 44 end-to-end checks on it unchanged. `2024` still selects the
-  2024 install.
-- **Download counts.** Tom's host has a stats page. What it answers: which of the 15
-  FreeLand tools humans actually download, and whether anyone still takes 1.1.17.
-  That number is the input to two open decisions — when to stop serving 1.1.17, and
-  whether the User block method dropped in 2.0 was load-bearing for anyone.
+- **Download counts.** Your host has a stats page. It answers which of the 15 FreeLand
+  tools humans actually fetch, and whether anyone still takes 1.1.17 — the input to two
+  open decisions: when to stop serving 1.1.17, and whether the User block method
+  dropped in 2.0 was load-bearing for anyone.
 
-### Still waiting on the world
-The WANTED notice on `turn.php` — four asks we cannot close ourselves: articulation
-angles for standard vehicles; the WB1/WB2 split; non-US standard vehicles; where
-AASHTO measures minimum turning radius from.
+### Waiting on the world
+The WANTED notice on `turn.php`: articulation angles for standard vehicles, the WB1/WB2
+split, non-US standard vehicles, and where AASHTO measures minimum turning radius from.
 
-### Next build
-**Phase 4's command, `c:drive`.** The kernel half is done, tested and committed:
-`turn-drive-path` takes a list of (steer . travel) inputs and returns the same
-shape `turn-path` returns, so everything downstream already works on a driven
-rig. What is left is the interaction — a `grread` loop, and a decision about what the
-user sees while steering. The model is not the hard part any more.
+### When 2.1.0 is ready to ship
+Drop `-dev` from **both** the `;;; VERSION` banner and `general.version`, run the full
+matrix, then:
 
-The trunk is **2.1.0-dev** and `turn-release.py` refuses to publish while the version
-carries a suffix, so the shipped 2.0.0 is safe from a work in progress. Drop the suffix
-from both the `;;; VERSION` banner and `general.version` to release.
+    python devtools/turn-release.py --publish
+    devtools\turn-tests.bat turn-release-smoke
+    # then commit in hawsedc.com/
 
-## Traps that cost time, still true
+## Traps, still true
 
-- **This shell eats backslashes, even inside a quoted heredoc.** It bit THREE times
-  in one session: `devtools\turn-tests.bat` inside a Python heredoc becomes a literal
-  TAB, so either the replacement silently matches nothing or a tab lands in the file.
-  Once was in the very handoff note warning about it. Use the Write and Edit tools for
-  any content containing a backslash. No exceptions, no cleverness.
-- **Never leave a `.scr` to quit a dirty drawing.** QUIT then asks whether to save, at
-  the command line, and in an unattended run nothing answers it — not a following
-  script line (`y` or `n`), not `(command "._quit" "_N")`. All three park forever
-  holding an `acad.exe`. Leaving the drawing saved is the one thing that works;
-  `(turn-test-safe-quit)` does it. A leftover `acad.exe` is the symptom.
-  *(I first wrote this up as a modal dialog. Tom corrected it — he watched it happen
-  and it was at the command line. The table in `CLAUDE.md` is what was measured;
-  the mechanism is not established and does not need to be.)*
-- **Verify AutoLISP assumptions, do not reason about them.** `getenv` was assumed to
-  read the environment the `.bat` hands to `acad.exe`. It does — but that was proven
-  by running it on both products, not by arguing it.
+- **This shell eats backslashes, even inside a quoted heredoc**, and backticks in a
+  double-quoted `-c` string get command-substituted. Use the Write and Edit tools for
+  any content with a backslash or a backtick. This bit four times in one session.
+- **AutoLISP scopes arguments dynamically**, so a parameter named after a built-in
+  shadows it inside every function you call. An argument called `distance` killed
+  `turn-step`, which is not even the function that declared it.
+- **Read the window title before assuming a hang**: `Get-Process acad | Select Id,
+  MainWindowTitle`. A crash dialog and a waiting prompt look identical from outside.
+- **Verify AutoLISP assumptions, do not reason about them.** The probes in `devtools/`
+  exist because guessing was wrong every time.
 - **Measure drawings, do not look at them.**
-- **Nothing closes in AutoCAD unless you tell it to.**
 
 ## Style notes worth carrying
 
-- Be brief. *"Remember to try to be as brief as Tom was for 20 years. Don't overwhelm
-  20 years of parsimony in a week."*
+- Be brief. *"Don't overwhelm 20 years of parsimony in a week."*
 - Do not assume one user's mistake is common.
 - Follow AutoCAD's settings rather than second-guessing them.
-- **Ask.** The single clearest instruction of this session: *"I would expect you to
-  clean up autonomously or ask me about every file that seems like an unexplained
-  mess to you."* An unexamined mess inherited from the last session is not a
-  convention. Question it.
+- **Ask, or clean up — do not route around a mess.** And when Tom says something is
+  wrong, it is: he has watched this program run for twenty years. The "modal dialog"
+  claim about QUIT was mine and it was wrong.

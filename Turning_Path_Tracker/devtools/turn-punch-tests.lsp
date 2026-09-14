@@ -120,6 +120,25 @@
   (turn-test-check "TURN is defined" (not (null c:turn)))
   (turn-test-check "BUILDVEHICLE is defined" (not (null c:buildvehicle)))
   (turn-test-check "the BV alias is defined" (not (null c:bv)))
+  (turn-test-check "DRIVE is defined" (not (null c:drive)))
+  ;; The banner has to name every command, or a user has no way to find one.
+  (turn-test-check "the load banner names TURN, DRIVE and BV"
+                   (turn-test-punch-banner-names-commands-p))
+)
+
+;; The line the user actually sees on load must list the commands that exist.
+(defun turn-test-punch-banner-names-commands-p (/ f found line)
+  (setq f (open (turn-test-src "turn.lsp") "r"))
+  (while (and (not found) (setq line (read-line f)))
+    (if (and (vl-string-search "loaded. Type" line)
+             (vl-string-search "TURN" line)
+             (vl-string-search "DRIVE" line)
+             (vl-string-search "BV" line))
+      (setq found T)
+    )
+  )
+  (close f)
+  found
 )
 
 ;;; ---------------------------------------------------------------------------
