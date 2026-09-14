@@ -1,0 +1,94 @@
+# Handoff — Turning Path Tracker, 2026-09-13 (second session)
+
+Read `CLAUDE.md` first for the durable facts. This file is the perishable part.
+
+The previous handoff said *"The freeland repo itself is uncommitted, and that is
+deliberate."* **That was wrong, twice over.** It was not deliberate, it was
+"don't commit unless asked" applied without ever asking; and the repo was not
+uncommitted — it has 15 commits going back to 2017, and the snapshots were all in
+them. Tom's standing instruction, given this session:
+
+> **"Commit and push prudently and parsimoniously, of course."**
+
+That is now the rule. It supersedes the old note. Do not re-invent the ban.
+
+## What this session did — a directional cleanup, no program changes
+
+`turn.lsp` was not touched. Everything below is structure, tooling and docs.
+
+1. **One True Copy, applied.** Twenty-two concurrent `turn*.lsp` snapshots deleted
+   (recoverable: `git show cafd98a:Turning_Path_Tracker/<name>`). `src/` — an
+   invention of the last session to avoid dealing with the attic — flattened away.
+   The program is `Turning_Path_Tracker/turn.lsp`, flat at the folder top like
+   every other FreeLand tool.
+2. **The shipped copy is now an artifact, not a second source.**
+   `devtools/turn-release.py` publishes trunk → `gnu/turn-<version>.lsp`, reads the
+   version out of the file, and refuses to proceed silently when the published copy
+   has drifted. **On its first run it found drift the hand-copy ritual had missed**
+   — `turn-layers.dat`, line endings only. Fixed by normalising the trunk, so no
+   published file changed.
+3. **The harness has no hardcoded paths and runs on both products.**
+   `turn-tests.bat` sets `TURNDEV` from `%~dp0`; `devtools/turn-dev-paths.lsp` (first
+   line of every `.scr`) derives the rest. 28 files of absolute paths are gone.
+   `turn-tests.bat <script> [c3d|acad]`.
+4. **First-ever run on Civil 3D.** Everything passes on both: 106 kernel, 44 end to
+   end, 7 release smoke, on Civil 3D 2026 *and* plain AutoCAD 2024.
+5. **`.gitignore` written** at the freeland root — `user_help/`, `hawsedc.com/`,
+   build output, AutoCAD litter. See the warning below.
+6. Docs corrected where they had gone false. A citation in ROADMAP was stale by 158
+   lines; **do not cite line numbers in prose** unless something checks them.
+
+## The one thing to be careful about
+
+`user_help/` holds **other people's drawings and correspondence**, with their names
+in them, and freeland pushes to a public GitHub. It is gitignored. That is adequate,
+not a lock: `git add -f` overrides it and it does nothing about zips or backups.
+Never commit it. Never quote a user's name into a public file.
+
+## Open, and who owns them
+
+### Tom
+- **Punch list item 7 is now actually runnable.** `devtools/turn-2.0.0-punch-list.md`.
+  Arcs, splines, and a real Civil 3D alignment — the last untested path in 2.0. The
+  harness could not reach it before because the `.bat` only drove plain AutoCAD; it
+  now drives C3D 2026 by default. This is the next real test.
+- **Kenya has not been replied to.** Draft ready and approved in substance:
+  `user_help/Kenya_Caldwell/draft-reply-4.md`.
+- **Rob Livingston** was emailed the REGION/UNION envelope approach. No reply yet.
+- **AutoCAD 2027 is being installed.** When it lands, add a third product branch to
+  `turn-tests.bat` — the file is structured for it, one `goto` label.
+- **Download counts.** Tom's host has a stats page. What it answers: which of the 15
+  FreeLand tools humans actually download, and whether anyone still takes 1.1.17.
+  That number is the input to two open decisions — when to stop serving 1.1.17, and
+  whether the User block method dropped in 2.0 was load-bearing for anyone.
+
+### Still waiting on the world
+The WANTED notice on `turn.php` — four asks we cannot close ourselves: articulation
+angles for standard vehicles; the WB1/WB2 split; non-US standard vehicles; where
+AASHTO measures minimum turning radius from.
+
+### Next build
+**Phase 4, interactive drive mode.** Phases 1–3 done. See `ROADMAP.md`.
+
+## Traps that cost time, still true
+
+- **This shell eats backslashes, even inside a quoted heredoc.** It bit again this
+  session: `devtools\\turn-tests.bat` inside a Python heredoc became a TAB and a
+  replacement silently matched nothing. Use the Write and Edit tools for any content
+  with backslashes. No exceptions, no cleverness.
+- **Verify AutoLISP assumptions, do not reason about them.** `getenv` was assumed to
+  read the environment the `.bat` hands to `acad.exe`. It does — but that was proven
+  by running it on both products, not by arguing it.
+- **Measure drawings, do not look at them.**
+- **Nothing closes in AutoCAD unless you tell it to.**
+
+## Style notes worth carrying
+
+- Be brief. *"Remember to try to be as brief as Tom was for 20 years. Don't overwhelm
+  20 years of parsimony in a week."*
+- Do not assume one user's mistake is common.
+- Follow AutoCAD's settings rather than second-guessing them.
+- **Ask.** The single clearest instruction of this session: *"I would expect you to
+  clean up autonomously or ask me about every file that seems like an unexplained
+  mess to you."* An unexamined mess inherited from the last session is not a
+  convention. Question it.
