@@ -30,9 +30,76 @@
 (defun tt-src (f) (strcat *tt-root* f))
 (defun tt-gnu (f) (strcat *tt-gnu* f))
 
+;;; ---------------------------------------------------------------------------
+;;; TRUSTEDPATHS
+;;;
 ;;; AutoCAD refuses to load LISP from an untrusted folder with a modal dialog,
-;;; which hangs a /b script forever. Trust our own tree, once, here.
-(setvar "TRUSTEDPATHS"
-  (strcat (getvar "TRUSTEDPATHS") ";" *tt-dir* ";" *tt-root* ";" *tt-gnu*)
+;;; which hangs a /b script forever. So the tree has to be trusted. Two traps,
+;;; both of which have already bitten:
+;;;
+;;; 1. TRUSTEDPATHS IS SAVED IN THE PROFILE, NOT THE SESSION. Appending to it
+;;;    unconditionally adds three entries on EVERY run. That is how Tom's Civil
+;;;    3D trusted locations became a mess he had to clean out by hand.
+;;; 2. Deduplicating on the raw string is not enough. "…\devtools" and
+;;;    "…\devtools/../devtools/" are the same folder and compare unequal, so an
+;;;    entry that is already there gets added again in a different spelling.
+;;;
+;;; Hence: normalise to a canonical form - backslashes, ".." resolved, no
+;;; trailing slash - then add only what is genuinely absent.
+;;; ---------------------------------------------------------------------------
+
+(defun tt-split (s delim / c i out piece)
+  (setq i 1 piece "" out nil)
+  (while (<= i (strlen s))
+    (setq c (substr s i 1))
+    (if (= c delim)
+      (setq out (cons piece out) piece "")
+      (setq piece (strcat piece c))
+    )
+    (setq i (1+ i))
+  )
+  (reverse (cons piece out))
 )
+
+(defun tt-join (lst delim / out)
+  (if lst
+    (progn
+      (setq out (car lst))
+      (foreach s (cdr lst) (setq out (strcat out delim s)))
+      out
+    )
+    ""
+  )
+)
+
+;; "C:/a/b/../c/" -> "C:\a\c"
+(defun tt-normalize (path / parts stack)
+  (setq parts (tt-split (vl-string-translate "/" "\\" path) "\\") stack nil)
+  (foreach p parts
+    (cond
+      ((or (= p "") (= p ".")) nil)
+      ((= p "..") (setq stack (cdr stack)))
+      (t (setq stack (cons p stack)))
+    )
+  )
+  (tt-join (reverse stack) "\\")
+)
+
+(defun tt-trust (path / canon current found)
+  (setq
+    canon (tt-normalize path)
+    current (getvar "TRUSTEDPATHS")
+    found nil
+  )
+  (foreach one (tt-split current ";")
+    (if (= (strcase (tt-normalize one)) (strcase canon)) (setq found T))
+  )
+  (if (not found)
+    (setvar "TRUSTEDPATHS"
+      (if (= "" current) canon (strcat current ";" canon))
+    )
+  )
+)
+
+(foreach p (list *tt-dir* *tt-root* *tt-gnu*) (tt-trust p))
 (princ)

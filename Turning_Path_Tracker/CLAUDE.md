@@ -262,11 +262,30 @@ Test harness lives in `devtools/`. Run it with:
 
     devtools\turn-tests.bat turn-core-tests               # kernel, 106 checks
     devtools\turn-tests.bat turn-integration-tests        # end to end, 44 checks
-    devtools\turn-tests.bat turn-core-tests acad          # same, on plain AutoCAD 2024
+    devtools\turn-tests.bat turn-curve-tests c3d c3d      # any curve type, 30 checks
+    devtools\turn-tests.bat turn-core-tests acad          # same, on plain AutoCAD 2027
 
-Second argument is the product: `c3d` (Civil 3D 2026, the default) or `acad` (plain
-AutoCAD 2024). Results land in `devtools/turn-test-log.md`. **All pass as of 2026-09-13
-on both products: 106 kernel, 44 end to end, 7 release smoke.**
+Second argument is the product: `c3d` (Civil 3D 2026, the default), `acad` (plain
+AutoCAD 2027) or `2024` (plain AutoCAD 2024). Third is the template, and the only
+value is `c3d`, which starts from `_Autodesk Civil 3D (Imperial) NCS.dwt`.
+
+**Pass the template only when creating Civil 3D objects.** A drawing from `acad.dwt`
+has one alignment style and no label sets, and every Aecc COM call fails with "the
+parameter is incorrect"; from the C3D template there are six styles and the same call
+is accepted. The other suites deliberately pass no template — no drawing and no `/t`
+is the arrangement they were proven on.
+
+Results land in `devtools/turn-test-log.md`. **All pass as of 2026-09-13: 106 kernel,
+44 end to end, 30 curve, 7 release smoke — on Civil 3D 2026, AutoCAD 2027 and AutoCAD
+2024.**
+
+### TRUSTEDPATHS is saved in the profile, not the session
+Appending to it unconditionally adds entries on **every run**. That is how the Civil 3D
+trusted locations became a mess Tom had to clean by hand, and how the old release-smoke
+`.scr` accumulated seven copies of a path ending in a literal `...`. `turn-dev-paths.lsp`
+now normalises each path — backslashes, `..` resolved, no trailing slash — and adds one
+only when genuinely absent. Verified convergent: three consecutive runs, five entries,
+unchanged.
 
 **No paths are hardcoded.** `turn-tests.bat` sets `TURNDEV` from its own location
 (`%~dp0`); `devtools/turn-dev-paths.lsp`, loaded on the first line of every `.scr`,
@@ -284,6 +303,7 @@ Other scripts in `devtools/`, all run the same way (`turn-tests.bat <name>`):
 | `turn-inspect-envl` | envelope loops with area, closure and end gap — the tool that found all three envelope defects |
 | `turn-probe-aashto` | reads the published AASHTO blocks |
 | `turn-probe-initget` | proved `initget` accepts hyphenated keywords like `WB-67` |
+| `turn-curve-tests` | punch item 7: LINE, ARC, SPLINE, ELLIPSE and a real Civil 3D alignment |
 
 Python helpers (PyMuPDF and pypdf are installed for this user):
 `devtools/make-turn-instruction-pdf.py` and `devtools/make-turn-zips.py` regenerate the

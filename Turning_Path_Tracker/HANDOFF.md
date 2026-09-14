@@ -27,15 +27,21 @@ That is now the rule. It supersedes the old note. Do not re-invent the ban.
    has drifted. **On its first run it found drift the hand-copy ritual had missed**
    — `turn-layers.dat`, line endings only. Fixed by normalising the trunk, so no
    published file changed.
-3. **The harness has no hardcoded paths and runs on both products.**
+3. **The harness has no hardcoded paths and runs on three products.**
    `turn-tests.bat` sets `TURNDEV` from `%~dp0`; `devtools/turn-dev-paths.lsp` (first
    line of every `.scr`) derives the rest. 28 files of absolute paths are gone.
-   `turn-tests.bat <script> [c3d|acad]`.
-4. **First-ever run on Civil 3D.** Everything passes on both: 106 kernel, 44 end to
-   end, 7 release smoke, on Civil 3D 2026 *and* plain AutoCAD 2024.
-5. **`.gitignore` written** at the freeland root — `user_help/`, `hawsedc.com/`,
+   `turn-tests.bat <script> [c3d|acad|2024] [c3d]`.
+4. **First-ever run on Civil 3D, and on AutoCAD 2027.** 106 kernel, 44 end to end,
+   30 curve, 7 release smoke — passing on Civil 3D 2026, AutoCAD 2027 and AutoCAD 2024.
+5. **Punch list item 7 closed by automating it.** See below.
+6. **A TRUSTEDPATHS leak, found and fixed.** It is saved in the profile, not the
+   session, so appending to it grew the list every run — that is what made Tom's Civil
+   3D trusted locations a mess, and the old release-smoke `.scr` had accumulated seven
+   copies of a path ending in a literal `...`. Paths are now normalised and added only
+   when absent; the affected profiles were cleaned. Verified convergent over three runs.
+7. **`.gitignore` written** at the freeland root — `user_help/`, `hawsedc.com/`,
    build output, AutoCAD litter. See the warning below.
-6. Docs corrected where they had gone false. A citation in ROADMAP was stale by 158
+8. Docs corrected where they had gone false. A citation in ROADMAP was stale by 158
    lines; **do not cite line numbers in prose** unless something checks them.
 
 ## The one thing to be careful about
@@ -48,15 +54,15 @@ Never commit it. Never quote a user's name into a public file.
 ## Open, and who owns them
 
 ### Tom
-- **Punch list item 7 is now actually runnable.** `devtools/turn-2.0.0-punch-list.md`.
-  Arcs, splines, and a real Civil 3D alignment — the last untested path in 2.0. The
-  harness could not reach it before because the `.bat` only drove plain AutoCAD; it
-  now drives C3D 2026 by default. This is the next real test.
+- **Punch list item 7 is DONE and automated.** `devtools\turn-tests.bat
+  turn-curve-tests c3d c3d` — 30 checks over LINE, ARC, SPLINE, ELLIPSE and a real
+  `AECC_ALIGNMENT`, all passing. It was never a hand test; it was a harness gap.
 - **Kenya has not been replied to.** Draft ready and approved in substance:
   `user_help/Kenya_Caldwell/draft-reply-4.md`.
 - **Rob Livingston** was emailed the REGION/UNION envelope approach. No reply yet.
-- **AutoCAD 2027 is being installed.** When it lands, add a third product branch to
-  `turn-tests.bat` — the file is structured for it, one `goto` label.
+- **AutoCAD 2027 is done.** `turn-tests.bat <script> acad` drives it, and TURN 2.0.0
+  passes 106 kernel and 44 end-to-end checks on it unchanged. `2024` still selects the
+  2024 install.
 - **Download counts.** Tom's host has a stats page. What it answers: which of the 15
   FreeLand tools humans actually download, and whether anyone still takes 1.1.17.
   That number is the input to two open decisions — when to stop serving 1.1.17, and

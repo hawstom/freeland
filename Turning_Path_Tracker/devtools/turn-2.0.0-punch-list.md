@@ -166,16 +166,40 @@ TURN: course 8N.N long, 1.N x the rig's 65.0 wheelbase.
 
 ---
 
-## 7. Any curve, not just a polyline
+## 7. Any curve, not just a polyline — DONE, automated 2026-09-13
 
 1.1.17 used MEASURE and needed a polyline. 2.0 samples the curve itself.
 
-**Do:** Run `TURN` picking, in separate runs: a plain ARC, a SPLINE, and if you have
-Civil 3D handy, an alignment.
+**No longer a hand test.** `devtools/turn-curve-tests.lsp` runs TURN against five
+curve types and checks what landed in the drawing each time:
 
-- [ ] Arc works
-- [ ] Spline works
-- [ ] Civil 3D alignment works
+    devtools\turn-tests.bat turn-curve-tests c3d c3d
+
+30 checks, all passing. Each type is asserted three ways: `vlax-curve-*` understands
+the object, sampling it gives a course whose length matches the curve, and TURN
+completes and draws geometry.
+
+- [x] Arc works — 193.8 ft arc, 23 entities drawn
+- [x] Spline works — a real SPLINE entity, 202.2 ft, 24 entities
+- [x] Civil 3D alignment works — **`AECC_ALIGNMENT`, 178.5 ft, 22 entities**
+- [x] Line works
+- [x] Ellipse works — closed curve, 634.7 ft, drives the whole perimeter
+
+**Two things this cost, worth knowing before the next Civil 3D test:**
+
+1. **The third argument to `turn-tests.bat` is the template, and Civil 3D objects
+   need it.** A drawing started from `acad.dwt` has one alignment style and no label
+   sets, and every Aecc COM call fails with the unhelpful "the parameter is
+   incorrect". Started from `_Autodesk Civil 3D (Imperial) NCS.dwt` it has six
+   alignment styles and the same call is accepted immediately. The other suites
+   deliberately pass no template.
+2. **`AeccAlignments.AddFromPolyline` wants the polyline's ObjectID, not the
+   object.** Passing the VLA-OBJECT gives "lisp value has no coercion to VARIANT";
+   passing `(vlax-get-property pl 'ObjectID)` works. Seven arguments exactly.
+   ProgID on this machine is `AeccXUiLand.AeccApplication.13.8`.
+
+Alignment creation is dialog driven at the command line, so it would hang a `/b`
+run; COM is the way in.
 
 ---
 
