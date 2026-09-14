@@ -1,0 +1,8 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 0)(setvar "filedia" 0)(setvar "attdia" 0)(setvar "attreq" 0)(setvar "blipmode" 0)
+(load (tt-dev "turn-tests.lsp"))(tt-start "TURN 2.0.0-dev integration - tractor, trailer and pup")
+(load (tt-src "turn.lsp"))
+(load (tt-dev "turn-core-tests.lsp"))
+(load (tt-dev "turn-integration-tests.lsp"))(tti-run)(tt-finish (tt-dev "turn-integration-out.dwg"))
+quit
+y

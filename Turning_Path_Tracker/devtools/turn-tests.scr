@@ -1,0 +1,55 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 1)
+(setvar "filedia" 0)
+(setvar "attdia" 0)
+(setvar "attreq" 0)
+(setvar "blipmode" 0)
+(load (tt-dev "turn-tests.lsp"))
+(tt-start "TURN 1.1.17 baseline - generated vehicle method")
+(load (tt-gnu "turn-1.1.17.lsp"))
+(tt-clobber-builtin-alert)
+(tt-section "Test 1: BUILDVEHICLE then TURN, truck with one trailer")
+-layer
+s
+0
+
+pline
+0,0
+200,100
+a
+300,100
+300,200
+
+turn
+generated
+test
+0,0
+20
+4
+3
+14
+3.5
+Yes
+3
+ttest
+12
+3.5
+6
+12
+4
+zoom
+extents
+turn
+g
+
+14,4
+2,1
+
+
+(tt-report-layers)
+(tt-report-paths T)
+(tt-report-census)
+(tt-report-plines)
+(tt-finish (tt-dev "turn-tests-out.dwg"))
+quit
+y

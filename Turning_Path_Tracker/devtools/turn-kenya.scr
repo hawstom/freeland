@@ -1,0 +1,6 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 0)(setvar "filedia" 0)
+(load (tt-dev "turn-tests.lsp"))(load (tt-src "turn.lsp"))(tt-capture-alerts)
+(load (tt-dev "turn-kenya.lsp"))(ky-run)
+quit
+y

@@ -1,0 +1,6 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 0)(setvar "filedia" 0)(setvar "blipmode" 0)
+(load (tt-gnu "turn-1.1.17.lsp"))
+(load (tt-dev "turn-repro-kenya.lsp"))(kr-run)
+quit
+y

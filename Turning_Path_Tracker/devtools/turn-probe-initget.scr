@@ -1,0 +1,14 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 0)(setvar "filedia" 0)
+(load (tt-dev "turn-probe-initget.lsp"))(pi-begin)(pi-test-initget)
+(pi-ask "exact hyphenated key typed")
+WB-67
+(pi-ask "lower case typed")
+wb-62
+(pi-ask "empty input (want nil so caller can default)")
+
+(pi-ask "a key with two hyphens")
+S-BUS-36
+(pi-say "")(pi-say "END OF PROBE")
+quit
+y
