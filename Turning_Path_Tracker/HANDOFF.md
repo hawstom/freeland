@@ -54,9 +54,14 @@ Never commit it. Never quote a user's name into a public file.
 ## Open, and who owns them
 
 ### Tom
-- **Punch list item 7 is DONE and automated.** `devtools\turn-tests.bat
-  turn-curve-tests c3d c3d` — 30 checks over LINE, ARC, SPLINE, ELLIPSE and a real
-  `AECC_ALIGNMENT`, all passing. It was never a hand test; it was a harness gap.
+- **The punch list is down to items 2 and 3, and they are the two worth your eye.**
+  Ten of eleven are automated: `turn-punch-tests` (53 checks) and `turn-curve-tests`
+  (30). What remains is whether the BUILDVEHICLE prompts *read* clearly — whether a
+  user can tell the tractor's rear-hitch question from the trailer's kingpin
+  question, which is exactly what Kenya could not do — plus one decision: keep
+  offering 30° steering lock and 70° articulation as defaults, or default to 0 and
+  stay silent rather than stand behind numbers nobody measured. A confident wrong
+  verdict is worse than none, and that call is yours.
 - **Kenya has not been replied to.** Draft ready and approved in substance:
   `user_help/Kenya_Caldwell/draft-reply-4.md`.
 - **Rob Livingston** was emailed the REGION/UNION envelope approach. No reply yet.
@@ -78,10 +83,14 @@ AASHTO measures minimum turning radius from.
 
 ## Traps that cost time, still true
 
-- **This shell eats backslashes, even inside a quoted heredoc.** It bit again this
-  session: `devtools\\turn-tests.bat` inside a Python heredoc became a TAB and a
-  replacement silently matched nothing. Use the Write and Edit tools for any content
-  with backslashes. No exceptions, no cleverness.
+- **This shell eats backslashes, even inside a quoted heredoc.** It bit THREE times
+  in one session: `devtools\turn-tests.bat` inside a Python heredoc becomes a literal
+  TAB, so either the replacement silently matches nothing or a tab lands in the file.
+  Once was in the very handoff note warning about it. Use the Write and Edit tools for
+  any content containing a backslash. No exceptions, no cleverness.
+- **Never end a `.scr` with a bare `quit`.** The "Save changes?" prompt is a modal
+  task dialog; no script line answers it, and the run holds an AutoCAD process
+  forever. Use `(tt-safe-quit)`. A leftover `acad.exe` is the symptom.
 - **Verify AutoLISP assumptions, do not reason about them.** `getenv` was assumed to
   read the environment the `.bat` hands to `acad.exe`. It does — but that was proven
   by running it on both products, not by arguing it.

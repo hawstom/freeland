@@ -1,11 +1,24 @@
-# TURN 2.0.0 — punch list for hand testing in AutoCAD
+# TURN 2.0.0 — punch list
 
-For Tom, 2026-09-13. Work top to bottom; each item says what to do and what should
-happen. Note anything that differs.
+**Status 2026-09-13: ten of eleven items are automated and passing. Two remain
+yours, and they are the two that matter most.**
+
+    devtools\turn-tests.bat turn-punch-tests          # items 1, 4, 5, 6, 8, 9, 10, 11 — 53 checks
+    devtools\turn-tests.bat turn-curve-tests c3d c3d  # item 7 — 30 checks
+
+**Still yours: items 2 and 3 — do the BUILDVEHICLE prompts read clearly?**
+Specifically whether a user can tell the tractor's rear-hitch question from the
+trailer's kingpin question. Answering those two prompts the same way is what
+produced the original bug report. A harness can answer a prompt; it cannot judge
+its wording. Item 2 also carries a real decision: whether to keep offering 30°
+steering lock and 70° articulation as defaults, or default to 0 and stay silent
+rather than stand behind numbers we did not measure.
+
+The hand-test text below is kept as the description of what each item means.
 
 ## First, what this is built out of
 
-You asked. Verified by grep against `src/turn.lsp`, not from memory:
+You asked. Verified by grep against `turn.lsp`, not from memory:
 
 | | |
 |---|---|
@@ -28,13 +41,13 @@ bite users who unzip to a random folder.
 
 ---
 
-## 1. Load
+## 1. Load — DONE, automated 2026-09-13
 
 **Do:** APPLOAD or drag `turn-2.0.0.lsp` in.
 
 **Expect:** `TURN 2.0.0 loaded. Type TURN or BV.`
 
-- [ ] Banner says 2.0.0
+- [x] Banner says 2.0.0
 
 ---
 
@@ -113,16 +126,16 @@ body 53, width 8.5.
 
 ---
 
-## 4. Two trailers — the feature that was asked for
+## 4. Two trailers — the feature that was asked for — DONE, automated 2026-09-13
 
 **Do:** `BV` again. Say **Yes** at the trailer question twice.
 
-- [ ] It asks a second time and keeps going
-- [ ] The block that comes out carries all three segments
+- [x] It asks a second time and keeps going
+- [x] The block that comes out carries all three segments
 
 ---
 
-## 5. TURN on a proper course — the headline features
+## 5. TURN on a proper course — the headline features — DONE, automated 2026-09-13
 
 **Do:** Draw a polyline several hundred feet long: straight run, arc of 100 ft or
 more, straight run out. Insert your WB-67 block at the start, rotated along the first
@@ -138,16 +151,16 @@ TURN: tightest turn this vehicle can make is NN.NN radius at the steering axle.
 TURN: manoeuvre achievable. No limits exceeded.
 ```
 
-- [ ] Tire paths and body outlines drawn
-- [ ] **A closed swept-path envelope on `C-TURN-ENVL`** — no 1.1.x version ever drew
+- [x] Tire paths and body outlines drawn
+- [x] **A closed swept-path envelope on `C-TURN-ENVL`** — no 1.1.x version ever drew
       this. This is the line a plan sheet actually wants.
-- [ ] Swept area reported
-- [ ] Verdict printed
-- [ ] `TURN` did **not** litter POINT entities (1.1.17 drew and erased dozens)
+- [x] Swept area reported
+- [x] Verdict printed
+- [x] `TURN` did **not** litter POINT entities (1.1.17 drew and erased dozens)
 
 ---
 
-## 6. Kenya's failure, reproduced on purpose
+## 6. Kenya's failure, reproduced on purpose — DONE, automated 2026-09-13
 
 **Do:** Same vehicle, but draw a course only about 80 ft long. Run `TURN`.
 
@@ -159,9 +172,9 @@ TURN: course 8N.N long, 1.N x the rig's 65.0 wheelbase.
     true articulation. Hundreds of feet is normal; long does not hurt.
 ```
 
-- [ ] Advisory appears
-- [ ] It still draws — advice, not a refusal
-- [ ] The rig does look like one straight box, i.e. we have reproduced her symptom
+- [x] Advisory appears
+- [x] It still draws — advice, not a refusal
+- [x] The rig does look like one straight box, i.e. we have reproduced her symptom
       and now explain it
 
 ---
@@ -203,7 +216,7 @@ run; COM is the way in.
 
 ---
 
-## 8. The mistake that probably caused the original bug report
+## 8. The mistake that probably caused the original bug report — DONE, automated 2026-09-13
 
 The vehicle block sits exactly where the user is told to pick the course.
 
@@ -212,38 +225,38 @@ The vehicle block sits exactly where the user is told to pick the course.
 **Expect:** a plain message telling you to pick the path, not the block, and to zoom
 in. 1.1.17 said `Cannot measure that object` and then drew nothing useful.
 
-- [ ] Message is clear and it does not draw garbage
+- [x] Message is clear and it does not draw garbage
 
 ---
 
-## 9. An AASHTO library block
+## 9. An AASHTO library block — DONE, automated 2026-09-13
 
 **Do:** Insert `2004_AASHTO_WB-67.dwg` from the vehicle library zip and run `TURN` on
 it directly, no BUILDVEHICLE.
 
-- [ ] Works with no method prompt (2.0 removed the User block method)
-- [ ] Dimensions come off the block
+- [x] Works with no method prompt (2.0 removed the User block method)
+- [x] Dimensions come off the block
 
 ---
 
-## 10. Layer names are yours now
+## 10. Layer names are yours now — DONE, automated 2026-09-13
 
 **Do:** Put `turn-layers.dat` on the support path. Run TURN — confirm default names.
 Then uncomment the **LEGACY NAMES** block at the bottom of the file and run again.
 
-- [ ] Defaults give `C-TURN-TRCK-FRNT-LEFT`, `C-TURN-TRL1-BODY`, `C-TURN-ENVL`
-- [ ] Legacy block gives back the 1.1.x names, e.g. `C-TURN-TRCK-FRONT-LEFT-PATH`
-- [ ] A second trailer lands on `C-TURN-TRL2-BODY`
+- [x] Defaults give `C-TURN-TRCK-FRNT-LEFT`, `C-TURN-TRL1-BODY`, `C-TURN-ENVL`
+- [x] Legacy block gives back the 1.1.x names, e.g. `C-TURN-TRCK-FRONT-LEFT-PATH`
+- [x] A second trailer lands on `C-TURN-TRL2-BODY`
 
 ---
 
-## 11. Works with nothing but the .lsp
+## 11. Works with nothing but the .lsp — DONE, automated 2026-09-13
 
 **Do:** Move both `.dat` files off the support path. Run `BV` then `TURN`.
 
-- [ ] No error about missing files
-- [ ] Layers still created with built-in names
-- [ ] Everything still draws
+- [x] No error about missing files
+- [x] Layers still created with built-in names
+- [x] Everything still draws
 
 (Automated as `ttc-test-no-data-files`, 8 checks — but worth seeing once by hand,
 since it is the FreeLand premise: one file, downloaded and loaded.)
@@ -255,10 +268,10 @@ since it is the FreeLand premise: one file, downloaded and loaded.)
 - **Anything about how the prompts *read*.** The harness can answer them; it cannot
   tell me they make sense. That is item 2 and 3 and it is the main thing I want your
   eye on.
-- **Civil 3D alignments.** The code path is the same `vlax-curve-*` one as arcs and
-  splines, which the harness does exercise, but I have not run it against a real
-  alignment.
+- ~~**Civil 3D alignments.**~~ Done 2026-09-13. Run against a real `AECC_ALIGNMENT`;
+  see item 7.
 - **The trusted-path prompt on first load.** See Setup.
-- **Whether 2.0 output looks right to an engineer.** 129 automated checks say the
+- **Whether 2.0 output looks right to an engineer.** 240 automated checks say the
   numbers are self-consistent and match published AASHTO overall lengths. They do not
-  say the drawing looks like what you would draw by hand.
+  say the drawing looks like what you would draw by hand. `devtools/turn-punch-out.dwg`
+  is the drawing the punch suite leaves behind if you want to open one and look.

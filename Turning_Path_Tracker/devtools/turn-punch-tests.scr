@@ -1,0 +1,7 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 0)(setvar "filedia" 0)(setvar "attdia" 0)(setvar "attreq" 0)(setvar "blipmode" 0)(setvar "osmode" 0)(setvar "peditaccept" 1)
+(load (tt-dev "turn-tests.lsp"))(tt-start "TURN 2.0.0 - the punch list, automated")
+(load (tt-src "turn.lsp"))(tt-capture-alerts)
+(load (tt-dev "turn-core-tests.lsp"))
+(load (tt-dev "turn-punch-tests.lsp"))(tpn-run)(tt-finish (tt-dev "turn-punch-out.dwg"))
+(tt-safe-quit)

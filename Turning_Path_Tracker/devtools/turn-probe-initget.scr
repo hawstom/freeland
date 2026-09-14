@@ -10,5 +10,4 @@ wb-62
 (pi-ask "a key with two hyphens")
 S-BUS-36
 (pi-say "")(pi-say "END OF PROBE")
-quit
-y
+(tt-safe-quit)

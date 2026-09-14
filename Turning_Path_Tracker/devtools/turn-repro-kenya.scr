@@ -2,5 +2,4 @@
 (setvar "cmdecho" 0)(setvar "filedia" 0)(setvar "blipmode" 0)
 (load (tt-gnu "turn-1.1.17.lsp"))
 (load (tt-dev "turn-repro-kenya.lsp"))(kr-run)
-quit
-y
+(tt-safe-quit)

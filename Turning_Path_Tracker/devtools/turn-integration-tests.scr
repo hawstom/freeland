@@ -4,5 +4,4 @@
 (load (tt-src "turn.lsp"))
 (load (tt-dev "turn-core-tests.lsp"))
 (load (tt-dev "turn-integration-tests.lsp"))(tti-run)(tt-finish (tt-dev "turn-integration-out.dwg"))
-quit
-y
+(tt-safe-quit)

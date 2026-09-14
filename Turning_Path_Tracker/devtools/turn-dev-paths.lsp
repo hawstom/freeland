@@ -102,4 +102,27 @@
 )
 
 (foreach p (list *tt-dir* *tt-root* *tt-gnu*) (tt-trust p))
+
+;;; ---------------------------------------------------------------------------
+;;; Quitting
+;;;
+;;; THE "SAVE CHANGES?" PROMPT ON QUIT IS A MODAL TASK DIALOG, not a command
+;;; line prompt, and FILEDIA does not change that. No script line can answer it:
+;;; a `quit` followed by `y` or by `n` both leave AutoCAD sitting there forever
+;;; holding the process. Tom found a session parked exactly there.
+;;;
+;;; The only reliable exit is to leave the drawing SAVED, so QUIT has nothing to
+;;; ask about. Every .scr ends with (tt-safe-quit).
+;;; ---------------------------------------------------------------------------
+(defun tt-safe-quit (/ scratch)
+  (setq scratch (strcat *tt-dir* "turn-scratch.dwg"))
+  (vl-file-delete scratch)
+  ;; SAVEAS rather than QSAVE: it takes a name whether or not the drawing
+  ;; already has one, so this behaves the same however the run got here.
+  ;; "" accepts the default file format.
+  (command "._saveas" "" scratch)
+  (command "._quit")
+  (princ)
+)
+
 (princ)

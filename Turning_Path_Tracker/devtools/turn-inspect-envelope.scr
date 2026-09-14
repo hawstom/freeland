@@ -1,5 +1,4 @@
 (load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
 (setvar "cmdecho" 0)(setvar "filedia" 0)
 (load (tt-dev "turn-inspect-plines.lsp"))(tp-run "C:/Users/tomha/Desktop/Drawing1.dwg" (tt-src "user_help/drawing1-plines.md"))
-quit
-y
+(tt-safe-quit)

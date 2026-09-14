@@ -8,5 +8,4 @@
 (gp-report "getreal typed -3" (getreal "\nProbe C, type -3: "))
 -3
 (gp-done)
-quit
-y
+(tt-safe-quit)

@@ -212,12 +212,19 @@
   (tt-write (strcat "- failed: " (itoa *tt-fail*)))
   (tt-write "")
   (tt-write (if (zerop *tt-fail*) "**ALL CHECKS PASSED**" "**THERE ARE FAILURES**"))
-  (if dwg-out
-    (progn
-      (vl-file-delete dwg-out)
-      (command "._qsave" dwg-out)
-    )
-  )
+  ;; ALWAYS leave the drawing saved, even when the caller wants no output file.
+  ;;
+  ;; A modified drawing makes QUIT ask "Save changes?", and with FILEDIA 0 that
+  ;; is a command line prompt the script has to answer. Answering it is the
+  ;; fragile part: "y" then wants a filename and parks there forever, which is
+  ;; exactly how a run was found still sitting at an unanswered quit. A saved
+  ;; drawing makes QUIT exit silently, so there is no prompt to get wrong.
+  ;;
+  ;; The trailing "quit / n" in each .scr is now only a backstop for the case
+  ;; where a LISP error aborts the script before this runs.
+  (setq dwg-out (if dwg-out dwg-out (strcat *tt-dir* "turn-scratch.dwg")))
+  (vl-file-delete dwg-out)
+  (command "._qsave" dwg-out)
   (princ)
 )
 (princ "\nturn-tests.lsp loaded.")

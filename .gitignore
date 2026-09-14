@@ -20,6 +20,11 @@ Turning_Path_Tracker/hawsedc.com/
 # --- Build and test output -------------------------------------------------
 # Produced by a run, not authored. Regenerate it; do not track it.
 Turning_Path_Tracker/devtools/turn-integration-out.dwg
+Turning_Path_Tracker/devtools/turn-curve-out.dwg
+Turning_Path_Tracker/devtools/turn-punch-out.dwg
+Turning_Path_Tracker/devtools/turn-tests-out.dwg
+# Written by tt-safe-quit so QUIT has nothing to ask about. See CLAUDE.md.
+Turning_Path_Tracker/devtools/turn-scratch.dwg
 
 # --- AutoCAD litter --------------------------------------------------------
 *.bak

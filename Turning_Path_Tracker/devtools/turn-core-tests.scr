@@ -3,5 +3,4 @@
 (load (tt-dev "turn-tests.lsp"))(tt-start "TURN 2.0.0-dev tracking kernel unit tests")
 (load (tt-src "turn.lsp"))(tt-capture-alerts)
 (load (tt-dev "turn-core-tests.lsp"))(ttc-run-all)(tt-finish nil)
-quit
-y
+(tt-safe-quit)

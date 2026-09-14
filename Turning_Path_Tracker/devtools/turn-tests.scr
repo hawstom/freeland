@@ -51,5 +51,4 @@ g
 (tt-report-census)
 (tt-report-plines)
 (tt-finish (tt-dev "turn-tests-out.dwg"))
-quit
-y
+(tt-safe-quit)

@@ -262,6 +262,7 @@ Test harness lives in `devtools/`. Run it with:
 
     devtools\turn-tests.bat turn-core-tests               # kernel, 106 checks
     devtools\turn-tests.bat turn-integration-tests        # end to end, 44 checks
+    devtools\turn-tests.bat turn-punch-tests              # the punch list, 53 checks
     devtools\turn-tests.bat turn-curve-tests c3d c3d      # any curve type, 30 checks
     devtools\turn-tests.bat turn-core-tests acad          # same, on plain AutoCAD 2027
 
@@ -276,8 +277,23 @@ is accepted. The other suites deliberately pass no template — no drawing and n
 is the arrangement they were proven on.
 
 Results land in `devtools/turn-test-log.md`. **All pass as of 2026-09-13: 106 kernel,
-44 end to end, 30 curve, 7 release smoke — on Civil 3D 2026, AutoCAD 2027 and AutoCAD
-2024.**
+44 end to end, 53 punch list, 30 curve, 7 release smoke — on Civil 3D 2026, AutoCAD
+2027 and AutoCAD 2024.**
+
+### Never end a `.scr` with a bare `quit`
+**The "Save changes?" prompt on QUIT is a modal task dialog, not a command line
+prompt, and FILEDIA does not change that.** No script line can answer it: `quit`
+followed by `y` *or* by `n` both leave AutoCAD sitting there forever holding the
+process. Tom found a session parked exactly there. `y` is the worse of the two — it
+also wants a filename.
+
+The only reliable exit is to leave the drawing **saved**, so QUIT has nothing to ask
+about. Every `.scr` ends with `(tt-safe-quit)`, defined in `turn-dev-paths.lsp`: it
+SAVEAS-es to `turn-scratch.dwg` and then quits. `tt-finish` also always saves now,
+even when the caller wants no output file.
+
+**The symptom to check for is a leftover `acad.exe`.** A run that leaves one behind
+did not exit; it is waiting on a dialog nobody can see.
 
 ### TRUSTEDPATHS is saved in the profile, not the session
 Appending to it unconditionally adds entries on **every run**. That is how the Civil 3D
@@ -304,6 +320,7 @@ Other scripts in `devtools/`, all run the same way (`turn-tests.bat <name>`):
 | `turn-probe-aashto` | reads the published AASHTO blocks |
 | `turn-probe-initget` | proved `initget` accepts hyphenated keywords like `WB-67` |
 | `turn-curve-tests` | punch item 7: LINE, ARC, SPLINE, ELLIPSE and a real Civil 3D alignment |
+| `turn-punch-tests` | punch items 1, 4, 5, 6, 8, 9, 10, 11 — what TURN draws, reports and refuses |
 
 Python helpers (PyMuPDF and pypdf are installed for this user):
 `devtools/make-turn-instruction-pdf.py` and `devtools/make-turn-zips.py` regenerate the

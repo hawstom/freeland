@@ -1,5 +1,4 @@
 (load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
 (setvar "cmdecho" 0)(setvar "filedia" 0)
 (load (tt-src "turn.lsp"))(load (tt-dev "turn-extract-vehicles.lsp"))(tx-run-all)
-quit
-y
+(tt-safe-quit)

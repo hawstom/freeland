@@ -1,181 +1,123 @@
-# TURN 2.0.0-dev tracking kernel unit tests
+# TURN 2.0.0-dev integration - tractor, trailer and pup
 
-Run at CDATE 20260913.222037
+Run at CDATE 20260913.232315
 AutoCAD 24.3s (LMS Tech) product AutoCAD
 
+- [23:23:15] start
 
-## Arcsine (1.1.x returned tan(asin x); the atan was missing)
+## BUILDVEHICLE: three segments, no prompting
 
-- PASS asin 0.0 (expected ~0.000000, got 0.000000)
-- PASS asin 0.5 (expected ~0.523599, got 0.523599)
-- PASS asin -0.5 (expected ~-0.523599, got -0.523599)
-- PASS asin 1.0 (expected ~1.570796, got 1.570796)
+- [23:23:15] vehicle block built
+- PASS a block insert was produced
+- PASS round trip recovers three segments (expected 3, got 3)
+- PASS round trip recovers the names (expected (Truck Trailer1 Pup), got (Truck Trailer1 Pup))
+- PASS round trip recovers the wheelbases (expected (14.0 12.0 10.0), got (14.0 12.0 10.0))
+- PASS round trip preserves front-hang signs (expected (3.0 -2.0 -2.0), got (3.0 -2.0 -2.0))
+- PASS round trip preserves which segments tow
 
-## Angle normalisation
+## Course sampled straight off the curve
 
-- PASS normalize 0 (expected ~0.000000, got 0.000000)
-- PASS normalize 2pi (expected ~0.000000, got 0.000000)
-- PASS normalize 350 deg reads as -10 (expected ~-0.174533, got -0.174533)
+- [23:23:15] course sampled
+- PASS the course has plenty of points
+- PASS travel starts at the picked end (expected ~0.000000, got 0.000000)
 
-## Straight course: nothing should turn
+## TURN: track the chain and draw it
 
-- PASS one state per course point (expected 41, got 41)
-- PASS final heading unchanged (expected ~0.000000, got 0.000000)
-- PASS trailing axle stays a wheelbase behind (expected ~14.000000, got 14.000000)
-- PASS trailing axle stayed on the centreline (expected ~0.000000, got 0.000000)
-- PASS no steer demanded (expected ~0.000000, got 0.000000)
-
-## Circular course: trailing axle radius = sqrt(R^2 - L^2)
-
-- PASS steady-state trailing radius (expected ~48.000000, got 48.000000)
-- PASS steer angle = asin(L/R) (expected ~0.283794, got 0.283794)
-
-## Segment chain: a tractor and two trailers
-
+- [23:23:18] TURN finished
 - PASS one path per segment (expected 3, got 3)
-- PASS every path has one state per course point (expected (901 901 901), got (901 901 901))
-- trailing-axle radii by segment: (58.3438 57.1752 55.9375)
-- PASS trailer 1 tracks inside the tractor
-- PASS trailer 2 tracks inside trailer 1
-- PASS all radii are positive and finite
 
-## Towing does not disturb the segment doing the towing
+## What reached the drawing
 
-- PASS solo vehicle yields one path (expected 1, got 1)
-- PASS towing vehicle yields two paths (expected 2, got 2)
-- PASS lead segment tracks identically either way (expected ~0.000000, got 0.000000)
+**Segment 0 - TRCK**
+- PASS one pline on C-TURN-TRCK-FRNT-LEFT (expected 1, got 1)
+- PASS one pline on C-TURN-TRCK-FRNT-RGHT (expected 1, got 1)
+- PASS one pline on C-TURN-TRCK-REAR-LEFT (expected 1, got 1)
+- PASS one pline on C-TURN-TRCK-REAR-RGHT (expected 1, got 1)
+- PASS four corner loci on C-TURN-TRCK-CRNR (expected 4, got 4)
+- PASS hitch path on C-TURN-TRCK-HTCH (expected 1, got 1)
+- PASS body outlines plotted on C-TURN-TRCK-BODY
+**Segment 1 - TRL1**
+- PASS one pline on C-TURN-TRL1-FRNT-LEFT (expected 1, got 1)
+- PASS one pline on C-TURN-TRL1-FRNT-RGHT (expected 1, got 1)
+- PASS one pline on C-TURN-TRL1-REAR-LEFT (expected 1, got 1)
+- PASS one pline on C-TURN-TRL1-REAR-RGHT (expected 1, got 1)
+- PASS four corner loci on C-TURN-TRL1-CRNR (expected 4, got 4)
+- PASS hitch path on C-TURN-TRL1-HTCH (expected 1, got 1)
+- PASS body outlines plotted on C-TURN-TRL1-BODY
+**Segment 2 - TRL2**
+- PASS one pline on C-TURN-TRL2-FRNT-LEFT (expected 1, got 1)
+- PASS one pline on C-TURN-TRL2-FRNT-RGHT (expected 1, got 1)
+- PASS one pline on C-TURN-TRL2-REAR-LEFT (expected 1, got 1)
+- PASS one pline on C-TURN-TRL2-REAR-RGHT (expected 1, got 1)
+- PASS four corner loci on C-TURN-TRL2-CRNR (expected 4, got 4)
+- PASS hitch path on C-TURN-TRL2-HTCH (expected 0, got 0)
+- PASS body outlines plotted on C-TURN-TRL2-BODY
 
-## Body geometry
+## AIA / National CAD Standard layer names
 
-- PASS front left x (expected ~3.000000, got 3.000000)
-- PASS front left y (expected ~4.000000, got 4.000000)
-- PASS front right y (expected ~-4.000000, got -4.000000)
-- PASS rear right x (expected ~-17.000000, got -17.000000)
-- PASS rear left y (expected ~4.000000, got 4.000000)
+- PASS layer names with a field that is not 4 characters (expected 0, got 0)
 
-## Corner loci - the left/right swept lines users ask for
+## Swept path envelope
 
-- PASS one locus point per step (expected 361, got 361)
-- outer swept radius (front outboard corner): 54.7083
-- inner swept radius (tightest body corner): 44.1022
-- swept width: 10.6062 for a body only 8.0000 wide
-- PASS front outboard corner sweeps outside the guide circle
-- PASS body reaches inside the trailing axle circle
-- PASS swept width exceeds the body width
+- PASS closed polylines on C-TURN-ENVL
+- PASS regions left behind on the envelope layer (expected 0, got 0)
+- PASS every envelope polyline is closed (expected 1, got 1)
+- envelope extents: (-154.701 -53.9962 50.0 4.1934)
+- corner locus extents: (-154.701 -53.9962 50.0 4.1934)
+- PASS the envelope encloses every corner locus
+- swept area: 2100.0, standing footprint: 416.0
+- PASS swept area exceeds the rig's standing footprint
+- PASS swept area fits inside the envelope's own bounding box
 
-## Analysis: steering lock and jackknife
+## Polyline integrity
 
-- PASS gentle curve reports nothing (expected 0, got 0)
-- reported: Steering lock exceeded on Tractor: course demands 48.3, vehicle has 30.0.
-- PASS tight radius is reported as unachievable
+- PASS polylines whose DXF 90 disagrees with their vertex count (expected 0, got 0)
+- PASS TURN drew some polylines at all
 
-## Reading a vehicle from block attributes
+## A step coarser than the shortest body opens holes
 
-- PASS three segments read (expected 3, got 3)
-- PASS segment names (expected (WB-50 Box Pup), got (WB-50 Box Pup))
-- PASS tractor wheelbase (expected ~14.000000, got 14.000000)
-- PASS trailer wheelbase comes from HITCHTOWHEEL (expected ~12.000000, got 12.000000)
-- PASS tractor front-hang is forward-positive (expected ~3.000000, got 3.000000)
-- PASS trailer front-hang is negated to the single convention (expected ~-2.000000, got -2.000000)
-- PASS steer lock converted to radians (expected ~0.523599, got 0.523599)
-- PASS last segment tows nothing
-- PASS legacy no-trailer block reads as one segment (expected 1, got 1)
+- PASS the fine-step run gave exactly one closed envelope (expected 1, got 1)
+- loops from the coarse run: 2
+- PASS a step longer than the shortest body opens holes
+- PASS every envelope loop is flagged closed, not merely shut-looking
+- PASS no zero-area slivers survive
 
-## Layer keys resolve to NCS-compliant names
+## Nothing was left behind
 
-- PASS segment 0 body (expected C-TURN-TRCK-BODY, got C-TURN-TRCK-BODY)
-- PASS segment 1 body (expected C-TURN-TRL1-BODY, got C-TURN-TRL1-BODY)
-- PASS segment 2 body (expected C-TURN-TRL2-BODY, got C-TURN-TRL2-BODY)
-- PASS segment 0 rear left path (expected C-TURN-TRCK-REAR-LEFT, got C-TURN-TRCK-REAR-LEFT)
-- PASS segment 3 corner loci (expected C-TURN-TRL3-CRNR, got C-TURN-TRL3-CRNR)
-- PASS vehicle envelope (expected C-TURN-ENVL, got C-TURN-ENVL)
+- PASS no stray POINT entities (1.1.x littered these) (expected 0, got 0)
 
-## Vehicle library: turn-vehicles.dat
+## Model space census
 
-- keys: (A-BUS BUS-40 BUS-45 CITY-BUS MH MHB P PB PT S-BUS-36 S-BUS-40 SU WB-40 WB-50 WB-62 WB-65 WB-67)
-- PASS all 17 library drawings are represented (expected 17, got 17)
-- PASS WB-50 is present
-- PASS P is present
-- PASS WB-50 is a two-segment vehicle (expected 2, got 2)
-- PASS WB-50 tractor wheelbase (expected ~12.500000, got 12.500000)
-- PASS WB-50 trailer hitch-to-axle (expected ~35.500000, got 35.500000)
-- PASS WB-50 tractor tows
-- PASS WB-50 trailer tows nothing
-- PASS WB-50 trailer nose overhangs the fifth wheel (expected ~3.000000, got 3.000000)
-- PASS A-BUS rear section starts behind the articulation joint (expected ~-2.000000, got -2.000000)
-- PASS WB-50 steering lock is absent, not a placeholder (expected ~0.000000, got 0.000000)
-- PASS segments still carrying the 0.5-radian placeholder angle (expected 0, got 0)
-- PASS library vehicles that fail to track a curve (expected 0, got 0)
-- PASS a missing library reads as empty, not an error (expected 0, got 0)
-
-## Library unit conversion
-
-- PASS feet to metres (expected ~0.304800, got 0.304800)
-- PASS metres to metres (expected ~1.000000, got 1.000000)
-- PASS an unknown unit reads as nil
-- PASS wheelbase scaled (expected ~4.267200, got 4.267200)
-- PASS negative front-hang keeps its sign when scaled (expected ~-0.609600, got -0.609600)
-- PASS steering lock is an angle and must not scale (expected ~0.523599, got 0.523599)
-- PASS a segment that tows nothing still tows nothing after scaling
-
-## Overall length - the check a user can make with a tape measure
-
-- PASS WB-67 overall length matches the published 73.5 ft (expected ~73.500000, got 73.500000)
-- PASS a lone tractor is its own body length (expected ~20.000000, got 20.000000)
-- PASS Kenya's mis-entered rig comes out at 125 (expected ~125.000000, got 125.000000)
-
-## Minimum turning radius from the steering lock
-
-- PASS 19.5 wheelbase at 30 degrees lock (expected ~39.000000, got 39.000000)
-- PASS the lock implied by a 45 ft turning radius (expected ~45.000000, got 45.000000)
-- PASS a zero steering lock reports no radius, not a wrong one
-- PASS no library vehicle claims a turning radius it cannot support
-
-## Course length against rig wheelbase
-
-- PASS WB-67 rig wheelbase is tractor + hitch + trailer (expected ~65.000000, got 65.000000)
-- PASS a lone tractor's rig wheelbase is its own wheelbase (expected ~14.000000, got 14.000000)
-- PASS a 100 unit straight course measures 100 (expected ~100.000000, got 100.000000)
-- PASS 82 ft under a WB-67 is below the short-course threshold
-- PASS 500 ft under a WB-67 is not
-
-## Runs with neither data file present
-
-- PASS a missing vehicles file yields an empty library
-- PASS and no keys
-- PASS and asking for a vehicle gives nil, not an error
-- PASS built-in tractor body layer (expected C-TURN-TRCK-BODY, got C-TURN-TRCK-BODY)
-- PASS built-in trailer 2 body layer (expected C-TURN-TRL2-BODY, got C-TURN-TRL2-BODY)
-- PASS built-in envelope layer (expected C-TURN-ENVL, got C-TURN-ENVL)
-- PASS a layer definition still carries colour and linetype
-- PASS a hand-built rig still tracks with no data files
-
-## Library scaling follows INSUNITS
-
-- PASS ft reads as Feet (expected Feet, got Feet)
-- PASS M reads as Meters (expected Meters, got Meters)
-- PASS in reads as Inches (expected Inches, got Inches)
-- PASS INSUNITS 1 names itself Inches (expected Inches, got Inches)
-- PASS a feet library in a drawing declaring inches scales by 12 (expected ~12.000000, got 12.000000)
-- PASS INSUNITS 2 names itself Feet (expected Feet, got Feet)
-- PASS a feet library in a drawing declaring feet does not scale (expected ~1.000000, got 1.000000)
-- PASS a feet library in a drawing declaring metres scales by 0.3048 (expected ~0.304800, got 0.304800)
-- PASS INSUNITS 0 names nothing
-- PASS an undeclared drawing is left unscaled (expected ~1.000000, got 1.000000)
-- PASS keyword string is space delimited (expected A-BUS WB-67, got A-BUS WB-67)
-- PASS a single key has no trailing space (expected SU, got SU)
-
-## The remembered step must still suit the vehicle
-
-- PASS with no memory, the default is wheelbase/10 (expected ~1.400000, got 1.400000)
-- PASS a finer remembered step is offered again (expected ~0.500000, got 0.500000)
-- PASS a remembered step longer than the shortest body is refused (expected ~1.400000, got 1.400000)
-- PASS a remembered step equal to the body length is refused (expected ~1.400000, got 1.400000)
-- PASS the shortest body in the rig is the one that governs (expected ~18.000000, got 18.000000)
+| Layer | Type | Count |
+|---|---|---|
+| 0 | INSERT | 1 |
+| 0 | LWPOLYLINE | 1 |
+| C-TURN-ENVL | LWPOLYLINE | 3 |
+| C-TURN-TRCK-BODY | LWPOLYLINE | 16 |
+| C-TURN-TRCK-CRNR | LWPOLYLINE | 8 |
+| C-TURN-TRCK-FRNT-LEFT | LWPOLYLINE | 2 |
+| C-TURN-TRCK-FRNT-RGHT | LWPOLYLINE | 2 |
+| C-TURN-TRCK-HTCH | LWPOLYLINE | 2 |
+| C-TURN-TRCK-REAR-LEFT | LWPOLYLINE | 2 |
+| C-TURN-TRCK-REAR-RGHT | LWPOLYLINE | 2 |
+| C-TURN-TRL1-BODY | LWPOLYLINE | 16 |
+| C-TURN-TRL1-CRNR | LWPOLYLINE | 8 |
+| C-TURN-TRL1-FRNT-LEFT | LWPOLYLINE | 2 |
+| C-TURN-TRL1-FRNT-RGHT | LWPOLYLINE | 2 |
+| C-TURN-TRL1-HTCH | LWPOLYLINE | 2 |
+| C-TURN-TRL1-REAR-LEFT | LWPOLYLINE | 2 |
+| C-TURN-TRL1-REAR-RGHT | LWPOLYLINE | 2 |
+| C-TURN-TRL2-BODY | LWPOLYLINE | 16 |
+| C-TURN-TRL2-CRNR | LWPOLYLINE | 8 |
+| C-TURN-TRL2-FRNT-LEFT | LWPOLYLINE | 2 |
+| C-TURN-TRL2-FRNT-RGHT | LWPOLYLINE | 2 |
+| C-TURN-TRL2-REAR-LEFT | LWPOLYLINE | 2 |
+| C-TURN-TRL2-REAR-RGHT | LWPOLYLINE | 2 |
 
 ## Summary
 
-- passed: 106
+- passed: 44
 - failed: 0
 
 **ALL CHECKS PASSED**
+- **ERROR**: Function cancelled
