@@ -96,13 +96,30 @@
 ;;; ---------------------------------------------------------------------------
 ;;; 1. Load
 ;;; ---------------------------------------------------------------------------
+;; ";;; VERSION x.y.z" in the file header must say the same thing as the
+;; general.version setting. turn-release.py names the published file from this,
+;; so a disagreement would ship a file whose banner lies about what it is.
+(defun tpn-banner-matches-p (/ f found line want)
+  (setq f (open (tt-src "turn.lsp") "r") want (wiki-turn-getvar "general.version"))
+  (while (and (not found) (setq line (read-line f)))
+    (if (vl-string-search (strcat ";;; VERSION " want) line) (setq found T))
+  )
+  (close f)
+  found
+)
+
 (defun tpn-item-1 ()
   (tt-section "Item 1 - Load")
-  (tt-equal "version setting reads 2.0.0" "2.0.0" (wiki-turn-getvar "general.version"))
+  ;; Not pinned to a literal: the trunk's version moves, and pinning it here
+  ;; would mean a version bump looks like a failing test. What matters is that
+  ;; the banner the user sees and the setting the program reads are the same
+  ;; string -- which is also what turn-release.py refuses to publish without.
+  (tt-write (strcat "- version: `" (wiki-turn-getvar "general.version") "`"))
+  (tt-check "a version is set" (< 0 (strlen (wiki-turn-getvar "general.version"))))
+  (tt-check "the header banner agrees with general.version" (tpn-banner-matches-p))
   (tt-check "TURN is defined" (not (null c:turn)))
   (tt-check "BUILDVEHICLE is defined" (not (null c:buildvehicle)))
   (tt-check "the BV alias is defined" (not (null c:bv)))
-  (tt-check "DRIVE is not claimed yet (Phase 4)" (null c:drive))
 )
 
 ;;; ---------------------------------------------------------------------------

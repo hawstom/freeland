@@ -585,6 +585,8 @@
   (ttc-test-no-data-files)
   (ttc-test-units)
   (ttc-test-default-step)
+  ;; Phase 4, the drive kernel. Pure, so it belongs in this suite.
+  (if tdv-run-all (tdv-run-all))
   (princ)
 )
 (princ "\nturn-core-tests.lsp loaded.")

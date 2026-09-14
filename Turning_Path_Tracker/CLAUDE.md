@@ -234,7 +234,44 @@ Found by measuring Tom's drawings with `devtools/turn-inspect-envl`, not by eye:
 Unexplained and deliberately not chased: a 2-segment run's envelope came back closed from
 the same pipeline that left a 3-segment run's open. We close it ourselves either way.
 
-## The trunk is `Turning_Path_Tracker/turn.lsp` (2.0.0) — One True Copy
+## Phase 4: drive mode (2.1.0-dev, unreleased)
+The kernel can now be **driven** — a steer angle and a travel distance per step —
+instead of only following a course drawn first. `wiki-turn-drive-step`,
+`wiki-turn-rest-states`, `wiki-turn-drive` and `wiki-turn-drive-path` are in
+SECTION 3 and are pure.
+
+**`wiki-turn-drive-path` returns the same shape as `wiki-turn-path`** — one list of
+states per segment — so the envelope, the findings and the report all work on a driven
+rig with no change. That equivalence is checked, not assumed: `tdv-test-equivalence`
+drives a rig, takes the course its guide axle actually traced, follows that course with
+`wiki-turn-path`, and compares every state. **Worst disagreement across 482 states:
+0.000000000000.** Keep that test passing; it is what stops drive mode becoming a second
+tracking model that drifts.
+
+Facts worth keeping from building it:
+
+- **The instantaneous turn centre is square to the TRAILING axle, not the guide axle.**
+  The guide axle rides `wheelbase/sin(steer)`, the trailing axle `wheelbase/tan(steer)`.
+  Getting that wrong made the first circle test fail by 20 ft.
+- **The integrator is first order**, because each step moves the guide along a straight
+  chord. Rather than pick a tolerance, `tdv-test-convergence` asserts that halving the
+  step halves the error; it measures **1.989 against a predicted 2.0**.
+- **Offtracking is inward only once the turn has developed.** A rig that starts straight
+  is stretched along the tangent, so its hindmost axle begins *outside* the tractor's
+  guide radius. Same fact the short-course advisory exists to explain.
+- **A turn can be impossible without exceeding the steering lock.** On a WB-67, 25° of
+  steer puts the tractor's trailing axle on a 41.8 radius, inside the trailer's own 45.5
+  wheelbase, so the trailer can never settle: articulation grows without limit and the
+  rig folds. TURN reports *"Jackknife: articulation behind Tractor reaches 93.6, limit is
+  70.0"* — from the hitch, with the lock never exceeded.
+
+Still to build: the interactive `c:drive` command — a `grread` loop over this kernel.
+
+**The trunk carries `-dev` in its version and `turn-release.py` refuses to publish while
+it does**, so the shipped 2.0.0 cannot be overwritten by work in progress. Drop the
+suffix from both the `;;; VERSION` banner and `general.version` to release.
+
+## The trunk is `Turning_Path_Tracker/turn.lsp` — One True Copy
 Flat at the folder top, like every other FreeLand tool (`Grading_Designer/gdd.lsp`,
 `Profile_Labeler/proflbl.lsp`). Ships with two optional data files, both found by
 `(findfile)`: `turn-layers.dat` (layer names, NCS-compliant, with a legacy block) and
@@ -280,7 +317,12 @@ Results land in `devtools/turn-test-log.md`. **All pass as of 2026-09-13: 106 ke
 44 end to end, 53 punch list, 30 curve, 7 release smoke — on Civil 3D 2026, AutoCAD
 2027 and AutoCAD 2024.**
 
-### Never end a `.scr` with a bare `quit`
+### How a `.scr` must end
+Two lines, always:
+
+    (tt-safe-quit)
+    quit
+
 **The "Save changes?" prompt on QUIT is a modal task dialog, not a command line
 prompt, and FILEDIA does not change that.** No script line can answer it: `quit`
 followed by `y` *or* by `n` both leave AutoCAD sitting there forever holding the
@@ -288,9 +330,14 @@ process. Tom found a session parked exactly there. `y` is the worse of the two �
 also wants a filename.
 
 The only reliable exit is to leave the drawing **saved**, so QUIT has nothing to ask
-about. Every `.scr` ends with `(tt-safe-quit)`, defined in `turn-dev-paths.lsp`: it
-SAVEAS-es to `turn-scratch.dwg` and then quits. `tt-finish` also always saves now,
-even when the caller wants no output file.
+about. `tt-safe-quit` (in `turn-dev-paths.lsp`) does that: if DBMOD says the drawing
+is dirty it SAVEAS-es to `turn-scratch.dwg`, otherwise it does nothing. `tt-finish`
+always saves too, even when the caller wants no output file.
+
+**The `quit` is a script line, not part of the LISP.** `(command "._quit")` inside a
+function tears the interpreter down mid-call and logs a spurious `**ERROR**: Function
+cancelled` on every run — noise that had been in every log since the harness was
+built, and exactly the kind that hides a real error.
 
 **The symptom to check for is a leftover `acad.exe`.** A run that leaves one behind
 did not exit; it is waiting on a dialog nobody can see.
@@ -338,6 +385,12 @@ and writes `turn-probe-aashto-log.md`.
 - **`TRUSTEDPATHS` is set once, in `turn-dev-paths.lsp`**, because script lines run before the LISP
   security check. Without it, loading from an untrusted folder raises a modal dialog.
 - Launch with `/p "AutoCAD"` or AutoCAD inherits the last-used profile and starts as Civil 3D.
+- **AutoLISP scopes arguments DYNAMICALLY, so a parameter named after a built-in shadows
+  it inside every function you call, not just your own.** `wiki-turn-drive-step` was first
+  written with an argument called `distance`; it does not call `distance` itself, but
+  `wiki-turn-step` does, and that died with `bad function: 5.0` — 5.0 being the travel
+  distance evaluated in function position. The breakage surfaces far from the name that
+  caused it. Same family as `last` below, and harder to see.
 - **AutoLISP has `last`.** Declaring a local named `last` shadows it and turns `(last x)` into
   a call to nil. The harness caught exactly this.
 - **AutoLISP `and` returns T, not its last value.** `(and file (findfile file))` yields `T`,

@@ -79,7 +79,15 @@ angles for standard vehicles; the WB1/WB2 split; non-US standard vehicles; where
 AASHTO measures minimum turning radius from.
 
 ### Next build
-**Phase 4, interactive drive mode.** Phases 1–3 done. See `ROADMAP.md`.
+**Phase 4's command, `c:drive`.** The kernel half is done, tested and committed:
+`wiki-turn-drive-path` takes a list of (steer . travel) inputs and returns the same
+shape `wiki-turn-path` returns, so everything downstream already works on a driven
+rig. What is left is the interaction — a `grread` loop, and a decision about what the
+user sees while steering. The model is not the hard part any more.
+
+The trunk is **2.1.0-dev** and `turn-release.py` refuses to publish while the version
+carries a suffix, so the shipped 2.0.0 is safe from a work in progress. Drop the suffix
+from both the `;;; VERSION` banner and `general.version` to release.
 
 ## Traps that cost time, still true
 

@@ -2,3 +2,4 @@
 (setvar "cmdecho" 0)(setvar "filedia" 0)
 (load (tt-dev "turn-inspect-plines.lsp"))(tp-run (tt-src "user_help/Kenya_Caldwell/Kenya-Caldwell-test-4.dwg") (tt-src "user_help/Kenya_Caldwell/plines-4.md"))
 (tt-safe-quit)
+quit

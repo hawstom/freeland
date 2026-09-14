@@ -2,3 +2,4 @@
 (setvar "cmdecho" 0)(setvar "filedia" 0)
 (load (tt-dev "turn-probe-aashto.lsp"))(pb-run)
 (tt-safe-quit)
+quit

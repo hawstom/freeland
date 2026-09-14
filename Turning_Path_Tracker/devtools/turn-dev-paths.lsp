@@ -112,16 +112,30 @@
 ;;; holding the process. Tom found a session parked exactly there.
 ;;;
 ;;; The only reliable exit is to leave the drawing SAVED, so QUIT has nothing to
-;;; ask about. Every .scr ends with (tt-safe-quit).
+;;; ask about. Every .scr therefore ends with two lines:
+;;;
+;;;     (tt-safe-quit)
+;;;     quit
+;;;
+;;; THE QUIT IS A SCRIPT LINE, NOT PART OF THE LISP. Calling (command "._quit")
+;;; from inside a function tears the interpreter down mid-call and logs a
+;;; spurious "Function cancelled" every run - noise that would hide a real
+;;; error. So the LISP only makes quitting safe; the script does the quitting.
 ;;; ---------------------------------------------------------------------------
 (defun tt-safe-quit (/ scratch)
-  (setq scratch (strcat *tt-dir* "turn-scratch.dwg"))
-  (vl-file-delete scratch)
-  ;; SAVEAS rather than QSAVE: it takes a name whether or not the drawing
-  ;; already has one, so this behaves the same however the run got here.
-  ;; "" accepts the default file format.
-  (command "._saveas" "" scratch)
-  (command "._quit")
+  ;; Only save if there is something to save. A suite that ended in tt-finish
+  ;; has already written its drawing, leaving DBMOD 0; saving again over the
+  ;; file that IS the current drawing fails and logs a spurious "Function
+  ;; cancelled", which is exactly the kind of noise that hides a real error.
+  (if (/= 0 (getvar "DBMOD"))
+    (progn
+      (setq scratch (strcat *tt-dir* "turn-scratch.dwg"))
+      (vl-file-delete scratch)
+      ;; SAVEAS rather than QSAVE: it takes a name whether or not the drawing
+      ;; already has one. "" accepts the default file format.
+      (command "._saveas" "" scratch)
+    )
+  )
   (princ)
 )
 

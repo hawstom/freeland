@@ -5,3 +5,4 @@
 (load (tt-dev "turn-core-tests.lsp"))
 (load (tt-dev "turn-curve-tests.lsp"))(tcv-run)(tt-finish (tt-dev "turn-curve-out.dwg"))
 (tt-safe-quit)
+quit

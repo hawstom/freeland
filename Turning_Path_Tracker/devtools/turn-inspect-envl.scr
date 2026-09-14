@@ -2,3 +2,4 @@
 (setvar "cmdecho" 0)(setvar "filedia" 0)
 (load (tt-dev "turn-inspect-envl.lsp"))(ev-run "C:/Users/tomha/Desktop/Drawing1.dwg" (tt-src "user_help/drawing1-envl.md"))
 (tt-safe-quit)
+quit

@@ -13,7 +13,19 @@
 ;;; GNU General Public License for more details.
 ;;;
 ;;; ===========================================================================
-;;; VERSION 2.0.0
+;;; VERSION 2.1.0-dev
+;;; ===========================================================================
+;;;
+;;; UNRELEASED. 2.0.0 is what hawsedc.com serves; this trunk is ahead of it.
+;;; devtools/turn-release.py refuses to publish while the version carries -dev,
+;;; so the shipped 2.0.0 cannot be overwritten by a work in progress. Drop the
+;;; suffix when the work is ready to go out.
+;;;
+;;; NEW IN 2.1.0: drive mode. The kernel can be driven a step at a time from a
+;;; steer angle and a travel distance, instead of only following a course that
+;;; was drawn first. wiki-turn-drive-path returns the same shape as
+;;; wiki-turn-path, so the envelope, the findings and the report all work on a
+;;; driven rig unchanged.
 ;;; ===========================================================================
 ;;;
 ;;; WHAT CHANGED FROM 1.1.17, AND WHY
@@ -123,7 +135,7 @@
      ;; End of program settings users can edit
      ;;-----------------------------------------------------------------------
      (list "general.icadmode" "False" 'str)
-     (list "general.version" "2.0.0" 'str)
+     (list "general.version" "2.1.0-dev" 'str)
    )
 )
 
@@ -421,13 +433,16 @@
   (reverse states)
 )
 
+;; Where this segment's hitch is in one state: a fixed distance behind its
+;; trailing axle. This is the next segment's guide point.
+(defun wiki-turn-hitch-point (hitch state)
+  (polar (wiki-turn-trail state) (wiki-turn-heading state) (- hitch))
+)
+
 ;; The course the NEXT segment's guide point follows: the locus of this
-;; segment's hitch, which rides a fixed distance behind its trailing axle.
+;; segment's hitch across every state.
 (defun wiki-turn-hitch-course (hitch states)
-  (mapcar
-    '(lambda (state) (polar (wiki-turn-trail state) (wiki-turn-heading state) (- hitch)))
-    states
-  )
+  (mapcar '(lambda (state) (wiki-turn-hitch-point hitch state)) states)
 )
 
 ;; THE CHAIN. Track a whole vehicle along a course.
@@ -446,6 +461,110 @@
     )
   )
   (reverse paths)
+)
+
+;;; ---------------------------------------------------------------------------
+;;; DRIVING
+;;;
+;;; Following a course answers "this is where the guide axle went; what did the
+;;; rig do?". Driving answers the question a user actually asks at the wheel:
+;;; "I am steering this hard and moving forward this far; where does the rig
+;;; end up?" It is the same kinematics read the other way round, and it needs
+;;; no new mathematics -- only the next guide point, which a steer angle and a
+;;; travel distance determine.
+;;;
+;;; In a bicycle model the steered wheel rolls in the direction it points, so
+;;; the guide axle centre travels along (heading + steer). wiki-turn-step then
+;;; recovers the heading change and the steer that geometry implies, exactly as
+;;; it does when following a drawn course. Driving with steer d and reading the
+;;; resulting state's steer back must give d again; the test suite asserts it.
+;;;
+;;; NOTHING HERE CLAMPS TO THE STEERING LOCK. The kernel reports what the
+;;; geometry does; wiki-turn-findings is what judges it against the vehicle's
+;;; limits, and the command shell is what refuses to steer further. Keeping the
+;;; judgement in one place is why the limits could be switched on at all.
+;;; ---------------------------------------------------------------------------
+
+;; Advance one segment by one step of driving, rather than by following a course.
+;;
+;; THE ARGUMENT IS CALLED "travel", NOT "distance", AND MUST STAY THAT WAY.
+;; AutoLISP scopes arguments dynamically, so a parameter named `distance` would
+;; shadow the `distance` subr for the whole call - including inside
+;; wiki-turn-step, which calls it. The first version of this function did
+;; exactly that and died with "bad function: 5.0", 5.0 being the travel
+;; distance evaluated in function position. Same trap as `last`, but worse: the
+;; shadowing reaches into functions this one calls, so the breakage surfaces far
+;; from the name that caused it.
+(defun wiki-turn-drive-step (state wheelbase steer travel)
+  (wiki-turn-step
+    state
+    wheelbase
+    (polar (wiki-turn-guide state) (+ (wiki-turn-heading state) steer) travel)
+  )
+)
+
+;; The whole rig, standing straight and still with its powered guide axle at
+;; GUIDE. Each segment is hitched to the one ahead. This is where driving starts.
+(defun wiki-turn-rest-states (vehicle guide heading-0 / hitch out state)
+  (foreach segment vehicle
+    (setq
+      state (wiki-turn-state
+              guide
+              (polar guide heading-0 (- (wiki-turn-seg-get segment "wheelbase")))
+              heading-0 0.0 0.0)
+      out (cons state out)
+      hitch (wiki-turn-seg-get segment "hitch")
+    )
+    (if hitch (setq guide (wiki-turn-hitch-point hitch state)))
+  )
+  (reverse out)
+)
+
+;; Drive the whole rig one step. Takes one state per segment and returns one
+;; state per segment. Only the powered unit is steered; every segment behind it
+;; is dragged to wherever the hitch ahead of it has moved, which is the same
+;; chain wiki-turn-path walks, one step at a time instead of all at once.
+(defun wiki-turn-drive (vehicle states steer travel / guide-1 hitch out segment state)
+  (setq out nil guide-1 nil)
+  (while vehicle
+    (setq
+      segment (car vehicle)
+      state (car states)
+      state
+       (if guide-1
+         (wiki-turn-step state (wiki-turn-seg-get segment "wheelbase") guide-1)
+         (wiki-turn-drive-step state (wiki-turn-seg-get segment "wheelbase") steer travel)
+       )
+      out (cons state out)
+      hitch (wiki-turn-seg-get segment "hitch")
+      guide-1 (if hitch (wiki-turn-hitch-point hitch state))
+      vehicle (cdr vehicle)
+      states (cdr states)
+    )
+  )
+  (reverse out)
+)
+
+;; Drive a sequence of inputs, each a (steer . distance) pair.
+;;
+;; RETURNS THE SAME SHAPE AS wiki-turn-path -- one list of states per segment,
+;; in vehicle order - so everything that draws, measures or judges a path works
+;; on a driven one with no change at all. That equivalence is the point of
+;; building drive mode on this kernel rather than beside it.
+(defun wiki-turn-drive-path (vehicle inputs guide heading-0 / history states)
+  (setq
+    states (wiki-turn-rest-states vehicle guide heading-0)
+    history (list states)
+  )
+  (foreach input inputs
+    (setq
+      states (wiki-turn-drive vehicle states (car input) (cdr input))
+      history (cons states history)
+    )
+  )
+  ;; history is newest-first and grouped by step; the drawing code wants it
+  ;; oldest-first and grouped by segment.
+  (apply 'mapcar (cons 'list (reverse history)))
 )
 
 ;; Articulation angle between two coupled segments at every step.

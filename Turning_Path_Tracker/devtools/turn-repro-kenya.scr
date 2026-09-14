@@ -3,3 +3,4 @@
 (load (tt-gnu "turn-1.1.17.lsp"))
 (load (tt-dev "turn-repro-kenya.lsp"))(kr-run)
 (tt-safe-quit)
+quit

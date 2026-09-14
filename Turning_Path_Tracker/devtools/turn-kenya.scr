@@ -3,3 +3,4 @@
 (load (tt-dev "turn-tests.lsp"))(load (tt-src "turn.lsp"))(tt-capture-alerts)
 (load (tt-dev "turn-kenya.lsp"))(ky-run)
 (tt-safe-quit)
+quit

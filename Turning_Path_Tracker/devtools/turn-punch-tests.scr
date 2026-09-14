@@ -5,3 +5,4 @@
 (load (tt-dev "turn-core-tests.lsp"))
 (load (tt-dev "turn-punch-tests.lsp"))(tpn-run)(tt-finish (tt-dev "turn-punch-out.dwg"))
 (tt-safe-quit)
+quit

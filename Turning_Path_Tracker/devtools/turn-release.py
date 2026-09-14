@@ -30,18 +30,32 @@ def sha(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+VERSION_RE = r"([0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.]+)?)"
+
+
 def version_of(p: Path) -> str:
     text = p.read_text(encoding="utf-8", errors="replace")
-    m = re.search(r'"general\.version"\s+"([0-9]+\.[0-9]+\.[0-9]+)"', text)
+    m = re.search(r'"general\.version"\s+"' + VERSION_RE + '"', text)
     if not m:
         sys.exit(f"FATAL: no general.version setting found in {p}")
-    banner = re.search(r";;;\s*VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)", text)
+    banner = re.search(r";;;\s*VERSION\s+" + VERSION_RE, text)
     if banner and banner.group(1) != m.group(1):
         sys.exit(
             f"FATAL: {p.name} disagrees with itself: header banner says "
             f"{banner.group(1)}, general.version says {m.group(1)}."
         )
     return m.group(1)
+
+
+def is_prerelease(version: str) -> bool:
+    """A version with a suffix, e.g. 2.1.0-dev, is work in progress.
+
+    The trunk keeps being edited after a release, so for most of its life it is
+    AHEAD of what users download. Publishing it then would replace a good
+    release with a half-finished one. The suffix is how the trunk says so; this
+    is what enforces it. Drop the suffix to release.
+    """
+    return "-" in version
 
 
 def main() -> int:
@@ -54,12 +68,29 @@ def main() -> int:
                  "Clone github.com/hawstom/hawsedc.com into Turning_Path_Tracker/.")
 
     version = version_of(TRUNK)
-    targets = [(TRUNK, GNU / f"turn-{version}.lsp")]
-    targets += [(TRUNK.parent / d, GNU / d) for d in DATA]
 
     print(f"trunk    {TRUNK}")
     print(f"version  {version}")
     print()
+
+    if is_prerelease(version):
+        print(f"{version} is a PRE-RELEASE. Nothing will be published.")
+        print()
+        print("The trunk is ahead of what users download, which is normal while")
+        print("work is in progress. Publishing now would replace a good release")
+        print("with a half-finished one.")
+        print()
+        print(f"Already published in {GNU.name}/:")
+        for f in sorted(GNU.glob("turn-*.lsp")):
+            print(f"    {f.name}")
+        print()
+        print("To release: drop the -suffix from BOTH the VERSION banner and the")
+        print('general.version setting in turn.lsp, run the full test matrix,')
+        print("then run this again with --publish.")
+        return 1
+
+    targets = [(TRUNK, GNU / f"turn-{version}.lsp")]
+    targets += [(TRUNK.parent / d, GNU / d) for d in DATA]
 
     stale = []
     for src, dst in targets:

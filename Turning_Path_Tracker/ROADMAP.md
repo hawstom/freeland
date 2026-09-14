@@ -208,12 +208,30 @@ changed `.gitignore` mid-session, so git now carries them.
 **Phase 0's original aim is met by this, not by the 1.1.18 it imagined.** All five
 1.1.17 defects are fixed outright in the 2.0 line rather than patched.
 
-### Phase 4 — Drive it
+### Phase 4 — Drive it — KERNEL DONE (2026-09-13), command still to build
 
 Interactive stepping — nudge the vehicle forward, steer, watch the rig follow — instead of
 drawing a polyline and hoping. This is AutoTURN's SmartPath, and it is the feature users
 describe when they say AutoTURN is easier. It is also the natural consumer of the Step model
 already defined in 2.0.
+
+**The kinematics half is done and tested**, in the pure kernel where it can be:
+`wiki-turn-drive-step`, `wiki-turn-rest-states`, `wiki-turn-drive`,
+`wiki-turn-drive-path`. It needed no new mathematics — only the next guide point, which
+a steer angle and a travel distance determine. 35 checks.
+
+The decision that made it cheap: **`wiki-turn-drive-path` returns the same shape as
+`wiki-turn-path`**, so the envelope, the findings and the report work on a driven rig
+unchanged. `tdv-test-equivalence` proves the two agree to 0.000000000000 over 482
+states, which is what keeps drive mode from becoming a second, drifting tracking model.
+
+Driving also reaches an analysis the drawn-course path cannot pose as naturally: a turn
+that is impossible *without* exceeding the steering lock. 25° of steer on a WB-67 puts
+the tractor's trailing axle inside the trailer's own wheelbase, so the trailer can never
+settle and the rig folds — reported as a jackknife from the hitch.
+
+**What remains is the interaction, not the model:** a `grread` loop for `c:drive`, and
+the question of what the user sees while steering. That is the next build.
 
 ### Phase 5 — Long tail
 
