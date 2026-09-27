@@ -1,4 +1,16 @@
 ;;; Civil 3D Subdivision Tools
+;;; Copyright 2025 Thomas Gail Haws
+;;;
+;;; This program is free software: you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation, either version 3 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; This program is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License for more details.
+;;;
 ;;; Version: 2025-08-28 TGH Not yet in Git version control
 ;;; Haws is a registered reserved symbol with Autodesk that will never conflict with other apps.
 ;;;

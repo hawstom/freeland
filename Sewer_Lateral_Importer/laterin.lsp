@@ -8,7 +8,7 @@
 ;;; This program is free software under the terms of the
 ;;; GNU (GNU--acronym for Gnu's Not Unix--sounds like canoe)
 ;;; General Public License as published by the Free Software Foundation,
-;;; version 2 of the License.
+;;; version 3 of the License, or (at your option) any later version.
 ;;;
 ;;; You can redistribute this software for any fee or no fee and/or
 ;;; modify it in any way, but it and ANY MODIFICATIONS OR DERIVATIONS
