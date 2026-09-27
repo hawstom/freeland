@@ -3,9 +3,15 @@
 `CLAUDE.md` holds the durable facts. This file is the perishable part: what just
 happened, and what Tom is about to test.
 
-## State in one paragraph
+## State, updated 2026-09-27
 
-**The trunk is 2.1.0-dev and it is NOT published.** `hawsedc.com/gnu/` still serves
+**2.1.0 is published into `freeland/hawsedc.com/gnu/` (not yet uploaded) and DRIVE ships
+in it experimental and unannounced**, because nobody has driven it by hand yet. The
+testing section below is still what is waiting. `CLAUDE.md` has the rest.
+
+## State on 2026-09-14, for the record
+
+**The trunk was 2.1.0-dev and it was NOT published.** `hawsedc.com/gnu/` still serves
 2.0.0, untouched, and `turn-release.py` refuses to publish anything whose version
 carries a `-suffix`, so a work in progress cannot overwrite a good release. Everything
 is committed and pushed on `main`. The punch list is closed. The whole test matrix is

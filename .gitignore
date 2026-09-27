@@ -11,17 +11,18 @@
 Turning_Path_Tracker/user_help/
 
 # --- Never commit: the website working copy --------------------------------
-# hawsedc.com/ is a clone of github.com/hawstom/hawsedc.com, nested here for
-# convenience because TURN's released files live in its gnu/ directory. It has
+# hawsedc.com/ is a clone of github.com/hawstom/hawsedc.com, kept at the freeland
+# root because its gnu/ directory serves every FreeLand tool. It has
 # its own history and its own remote. Without this rule git offers to commit it
 # as a gitlink, which would be wrong in both repos.
-Turning_Path_Tracker/hawsedc.com/
+hawsedc.com/
 
 # --- Build and test output -------------------------------------------------
 # Produced by a run, not authored. Regenerate it; do not track it.
 Turning_Path_Tracker/devtools/turn-integration-out.dwg
 Turning_Path_Tracker/devtools/turn-curve-out.dwg
 Turning_Path_Tracker/devtools/turn-punch-out.dwg
+Turning_Path_Tracker/devtools/turn-envelope-out.dwg
 Turning_Path_Tracker/devtools/turn-tests-out.dwg
 # Written by tt-safe-quit so QUIT has nothing to ask about. See CLAUDE.md.
 Turning_Path_Tracker/devtools/turn-scratch.dwg
@@ -33,3 +34,5 @@ Turning_Path_Tracker/devtools/turn-scratch.dwg
 *.err
 *.sv$
 *.ac$
+# AutoCAD 2027's crash reporter logs its own start-up into the working directory.
+ErrorReports/

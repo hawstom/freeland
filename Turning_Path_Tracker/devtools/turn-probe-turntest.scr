@@ -1,0 +1,7 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 0)(setvar "filedia" 0)(setvar "attdia" 0)(setvar "attreq" 0)(setvar "osmode" 0)(setvar "peditaccept" 1)
+(load (turn-test-dev "turn-tests.lsp"))(turn-test-start "Probe: Tom's turntest.dwg run, unattended")
+(load (turn-test-src "turn.lsp"))(turn-test-capture-alerts)
+(turn-test-write "- before loads")(load (turn-test-dev "turn-inspect-outside.lsp"))(turn-test-write "- outside loaded")(load (turn-test-dev "turn-probe-turntest.lsp"))(turn-probe-tt-run)(turn-test-finish nil)
+(turn-test-safe-quit)
+quit

@@ -1,0 +1,9 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 0)(setvar "filedia" 0)(setvar "attdia" 0)(setvar "attreq" 0)(setvar "blipmode" 0)(setvar "osmode" 0)(setvar "peditaccept" 1)
+(load (turn-test-dev "turn-tests.lsp"))(turn-test-start "TURN - envelope fidelity")
+(load (turn-test-src "turn.lsp"))(turn-test-capture-alerts)
+(load (turn-test-dev "turn-core-tests.lsp"))
+(load (turn-test-dev "turn-integration-tests.lsp"))(load (turn-test-dev "turn-punch-tests.lsp"))
+(load (turn-test-dev "turn-envelope-tests.lsp"))(turn-test-envelope-run)(turn-test-finish (turn-test-dev "turn-envelope-out.dwg"))
+(turn-test-safe-quit)
+quit

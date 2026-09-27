@@ -13,19 +13,28 @@
 ;;; GNU General Public License for more details.
 ;;;
 ;;; ===========================================================================
-;;; VERSION 2.1.0-dev
+;;; VERSION 2.1.0
 ;;; ===========================================================================
 ;;;
-;;; UNRELEASED. 2.0.0 is what hawsedc.com serves; this trunk is ahead of it.
-;;; devtools/turn-release.py refuses to publish while the version carries -dev,
-;;; so the shipped 2.0.0 cannot be overwritten by a work in progress. Drop the
-;;; suffix when the work is ready to go out.
+;;; NEW IN 2.1.0
+;;; - The swept-path envelope is built from the traced paths of six fixed points
+;;;   per body instead of a stack of snapshots, which notched the outside of
+;;;   every turn with a sawtooth (0.30 ft on a WB-67 at the default step). It is
+;;;   faster, and a coarse step no longer opens holes in it.
+;;; - An axle wider than its body is included in the envelope.
+;;; - Trailers no longer get "front tire" paths at the kingpin, where there are
+;;;   no wheels.
+;;; - TURN warns when the vehicle block faces away from the course.
+;;; - TURN says what drawing units it read (INSUNITS) and what it did about them,
+;;;   and offers a remembered calculation step only while it suits the vehicle.
 ;;;
-;;; NEW IN 2.1.0: drive mode. The kernel can be driven a step at a time from a
-;;; steer angle and a travel distance, instead of only following a course that
-;;; was drawn first. turn-drive-path returns the same shape as
-;;; turn-path, so the envelope, the findings and the report all work on a
-;;; driven rig unchanged.
+;;; DRIVE, steering the rig with the cursor, is in this file but EXPERIMENTAL:
+;;; not yet tested by hand, and not announced. It says so when run.
+;;;
+;;; RELEASING. devtools/turn-release.py refuses to publish a version that carries
+;;; a -suffix, and refuses to republish a released version with different
+;;; contents. After a release, the next change to this file gives it a new
+;;; version with a -dev suffix.
 ;;; ===========================================================================
 ;;;
 ;;; WHAT CHANGED FROM 1.1.17, AND WHY
@@ -103,6 +112,11 @@
 ;;; where S = distance F0 to F1, L = wheelbase, alpha = angle F1|F0|B0.
 ;;; ===========================================================================
 
+;; The vlax-curve-* and vla-* functions exist only after this. The test harness
+;; calls it before loading TURN, which is exactly how its absence here went
+;; unnoticed.
+(vl-load-com)
+
 ;;; ===========================================================================
 ;;; SECTION 1  SETTINGS AND LAYERS
 ;;; ===========================================================================
@@ -135,7 +149,7 @@
      ;; End of program settings users can edit
      ;;-----------------------------------------------------------------------
      (list "general.icadmode" "False" 'str)
-     (list "general.version" "2.1.0-dev" 'str)
+     (list "general.version" "2.1.0" 'str)
    )
 )
 
@@ -288,14 +302,27 @@
 ;; running it in another left entmake silently failing on absent layers.
 (defun turn-make-segment-layers (index / def role)
   (foreach role *turn-roles*
-    (setq def (turn-layer-def index (car role)))
-    (turn-make-layer
-      (car def)
-      (cadr def)
-      (strcat "TURN.LSP " (caddr role))
-      (caddr def)
+    (if (turn-role-applies-p index (car role))
+      (progn
+        (setq def (turn-layer-def index (car role)))
+        (turn-make-layer
+          (car def)
+          (cadr def)
+          (strcat "TURN.LSP " (caddr role))
+          (caddr def)
+        )
+      )
     )
   )
+)
+
+;; Only the powered unit has wheels at its guide point. A towed segment's guide
+;; point is its kingpin or drawbar eye, whose path is the towing segment's HTCH;
+;; a dolly is a segment of its own, with its wheels on its trailing axle. So a
+;; trailer has no front tire paths and gets no layers for them. (2.0.0 drew
+;; them anyway, one axle width apart at the kingpin, where there are no wheels.)
+(defun turn-role-applies-p (index role)
+  (or (zerop index) (not (wcmatch role "FRNT-*")))
 )
 
 (defun turn-make-vehicle-layers (/ def role)
@@ -625,6 +652,228 @@
   )
 )
 
+;; T if P lies inside or on the convex outline CORNERS, within TOLERANCE.
+(defun turn-inside-convex-p (p corners tolerance / a b cross neg pos)
+  (setq b (car (reverse corners)) pos 0 neg 0)
+  (foreach a corners
+    (setq cross (/ (- (* (- (car a) (car b)) (- (cadr p) (cadr b)))
+                      (* (- (cadr a) (cadr b)) (- (car p) (car b))))
+                   (distance a b)))
+    (cond ((> cross tolerance) (setq pos (1+ pos)))
+          ((< cross (- tolerance)) (setq neg (1+ neg))))
+    (setq b a)
+  )
+  (or (zerop pos) (zerop neg))
+)
+
+(defun turn-vector (a b) (list (- (car b) (car a)) (- (cadr b) (cadr a))))
+(defun turn-cross (u v) (- (* (car u) (cadr v)) (* (cadr u) (car v))))
+
+;; Twice the signed area of a polygon. Positive is counter-clockwise.
+(defun turn-signed-area2 (pts / a b s)
+  (setq s 0.0 b (car (reverse pts)))
+  (foreach a pts
+    (setq s (+ s (turn-cross b a)) b a)
+  )
+  s
+)
+
+;; Where segment P1-P2 properly crosses segment P3-P4, or nil. Touching at an
+;; end, or running collinear, is not a crossing.
+(defun turn-crossing (p1 p2 p3 p4 / d1 d2 d3 d4)
+  (setq
+    d1 (turn-cross (turn-vector p3 p4) (turn-vector p3 p1))
+    d2 (turn-cross (turn-vector p3 p4) (turn-vector p3 p2))
+    d3 (turn-cross (turn-vector p1 p2) (turn-vector p1 p3))
+    d4 (turn-cross (turn-vector p1 p2) (turn-vector p1 p4))
+  )
+  (if (and (< (* d1 d2) 0.0) (< (* d3 d4) 0.0))
+    (list (+ (car p1) (* (/ d1 (- d1 d2)) (- (car p2) (car p1))))
+          (+ (cadr p1) (* (/ d1 (- d1 d2)) (- (cadr p2) (cadr p1)))))
+  )
+)
+
+;; T if no two non-adjacent edges of the closed polygon PTS cross.
+;;
+;; Every pair is tried, so it is quadratic; the lists are walked, never
+;; indexed, because nth inside the double loop made it cubic, and a 600-vertex
+;; strip took most of a minute. A pair whose bounding boxes do not overlap is
+;; rejected on four comparisons.
+(defun turn-simple-polygon-p (pts / box boxes e edges first ok rest)
+  (setq
+    edges (mapcar 'list pts (append (cdr pts) (list (car pts))))
+    boxes (mapcar '(lambda (e)
+                     (list (min (car (car e)) (car (cadr e))) (min (cadr (car e)) (cadr (cadr e)))
+                           (max (car (car e)) (car (cadr e))) (max (cadr (car e)) (cadr (cadr e)))))
+                  edges)
+    edges (mapcar 'cons boxes edges)
+    first (car edges)
+    ok T
+  )
+  (while (and ok (cddr edges))
+    (setq e (car edges) box (car e) rest (cddr edges))
+    (while (and ok rest)
+      ;; The first edge and the last are adjacent round the closure.
+      (if (and (not (and (eq e first) (null (cdr rest))))
+               (<= (car (caar rest)) (caddr box)) (<= (car box) (caddr (caar rest)))
+               (<= (cadr (caar rest)) (cadddr box)) (<= (cadr box) (cadddr (caar rest)))
+               (turn-crossing (cadr e) (caddr e) (cadr (car rest)) (caddr (car rest))))
+        (setq ok nil)
+      )
+      (setq rest (cdr rest))
+    )
+    (setq edges (cdr edges))
+  )
+  ok
+)
+
+;;; ---------------------------------------------------------------------------
+;;; What one segment sweeps, from the paths of six of its points
+;;; ---------------------------------------------------------------------------
+;;; The kernel never lets the trailing axle slip, so at every instant the
+;;; segment turns about a centre on the trailing axle's line. Two things follow.
+;;;
+;;; Along any edge of the body, distance from that centre changes one way only
+;;; between the edge's ends - provided each side is cut where it passes abeam
+;;; the trailing axle. So the four corners and the two side points abeam the
+;;; trailing axle each trace a path, and each edge piece between two of them
+;;; sweeps exactly the strip between their two paths. The swept ground of the
+;;; segment is those six strips plus its first and last placement.
+;;;
+;;; In particular the inside of a turn is traced by a FIXED point: the side
+;;; point abeam the trailing axle, always the part of the side nearest the turn
+;;; centre. (An earlier note said the governing point slid along the side. That
+;;; was wrong for this kinematic model.)
+;;;
+;;; The error is chord against arc, second order in the step. There is no
+;;; sawtooth, because every edge follows a traced point instead of a stack of
+;;; snapshots. devtools/turn-envelope-tests measures it; do not restate the
+;;; claim without running that.
+;;;
+;;; Tom's design, 2026-09-26. It replaced a union of the body outline at every
+;;; step plus corner-fill triangles: hundreds of regions per segment, a notch
+;;; threshold, batched unions, and a pipeline one bad polygon could stall.
+
+;; The points whose paths bound the sweep, in order round the outline:
+;; FL, FR, right side abeam the trailing axle, RR, RL, left side abeam it.
+;; When the trailing axle is not alongside the body the sides need no cut.
+(defun turn-sweep-points (segment state / aft corners half heading)
+  (setq
+    corners (turn-body-corners segment state)
+    heading (turn-heading state)
+    half (/ (turn-seg-get segment "body-width") 2.0)
+    aft (+ (turn-seg-get segment "front-hang") (turn-seg-get segment "wheelbase"))
+  )
+  (if (< 0.0 aft (turn-seg-get segment "body-length"))
+    (list (nth 0 corners) (nth 1 corners)
+          (turn-right (turn-trail state) heading half)
+          (nth 2 corners) (nth 3 corners)
+          (turn-left (turn-trail state) heading half))
+    corners
+  )
+)
+
+;; Polygons covering what the edge from point path AS to point path BS sweeps.
+;;
+;; Step by step the edge sweeps a quadrilateral a0 a1 b1 b0. Consecutive quads
+;; that turn the same way are merged into one strip, cut again after 90 degrees
+;; of turning so a strip can never wrap round onto itself, and every strip is
+;; checked for crossing itself before it is returned: one bad polygon makes
+;; UNION fail, and a failed UNION merges nothing at all (Tom's turntest.dwg,
+;; 1387 regions left).
+;;
+;; A quad whose sides cross - the edge pivoting about a point on itself, as
+;; when a rig starts facing against its course - is a bowtie, and becomes its
+;; two triangles.
+;;
+;; A quad thinner than TOLERANCE is dropped. That is a side sliding along itself
+;; on a straight, which sweeps nothing the front and rear edges do not. The
+;; envelope may miss by up to TOLERANCE where a side creeps outward that slowly.
+(defun turn-edge-sweep (as bs tolerance / a0 a1 area b0 b1 chunk-a chunk-b
+                           out sign swung turned x)
+  (setq swung 0.0)
+  (while (cdr as)
+    (setq
+      a0 (car as) a1 (cadr as) b0 (car bs) b1 (cadr bs)
+      as (cdr as) bs (cdr bs)
+    )
+    (cond
+      ((setq x (turn-crossing a0 a1 b1 b0))
+       (setq out (turn-edge-sweep-flush chunk-a chunk-b out)
+             chunk-a nil chunk-b nil sign nil swung 0.0
+             out (turn-keep-thick (list a0 x b0) tolerance out)
+             out (turn-keep-thick (list x a1 b1) tolerance out))
+      )
+      ((setq x (turn-crossing a1 b1 b0 a0))
+       (setq out (turn-edge-sweep-flush chunk-a chunk-b out)
+             chunk-a nil chunk-b nil sign nil swung 0.0
+             out (turn-keep-thick (list a0 a1 x) tolerance out)
+             out (turn-keep-thick (list x b1 b0) tolerance out))
+      )
+      ((< (abs (setq area (/ (turn-signed-area2 (list a0 a1 b1 b0)) 2.0)))
+          (* tolerance (distance a0 b0)))
+       (setq out (turn-edge-sweep-flush chunk-a chunk-b out)
+             chunk-a nil chunk-b nil sign nil swung 0.0)
+      )
+      (t
+       (setq turned (abs (turn-normalize-angle (- (angle a1 b1) (angle a0 b0)))))
+       (if (or (null chunk-a)
+               (not (eq sign (minusp area)))
+               (< (/ pi 2.0) (+ swung turned)))
+         (setq out (turn-edge-sweep-flush chunk-a chunk-b out)
+               chunk-a (list a0) chunk-b (list b0) sign (minusp area) swung 0.0)
+       )
+       (setq
+         chunk-a (cons a1 chunk-a)
+         chunk-b (cons b1 chunk-b)
+         swung (+ swung turned)
+       )
+      )
+    )
+  )
+  (turn-edge-sweep-flush chunk-a chunk-b out)
+)
+
+;; Close off a strip under construction (points held newest first) onto OUT.
+(defun turn-edge-sweep-flush (chunk-a chunk-b out)
+  (if (cdr chunk-a)
+    (append (turn-strip-pieces (reverse chunk-a) (reverse chunk-b)) out)
+    out
+  )
+)
+
+;; PTS onto OUT, unless it is thinner than TOLERANCE across its first side.
+(defun turn-keep-thick (pts tolerance out)
+  (if (< (* tolerance (distance (car pts) (cadr pts)))
+         (abs (/ (turn-signed-area2 pts) 2.0)))
+    (cons pts out)
+    out
+  )
+)
+
+;; The strip between point paths AS and BS as one polygon, or halved until each
+;; piece is a simple polygon. A single step cannot fail the test: a quad whose
+;; sides cross never reaches here.
+(defun turn-strip-pieces (as bs / half pts)
+  (setq pts (append as (reverse bs)))
+  (cond
+    ((turn-simple-polygon-p pts) (list pts))
+    (t
+     (setq half (/ (length as) 2))
+     (append
+       (turn-strip-pieces (turn-list-head as (1+ half)) (turn-list-head bs (1+ half)))
+       (turn-strip-pieces (turn-list-tail as half) (turn-list-tail bs half))
+     )
+    )
+  )
+)
+
+(defun turn-list-head (lst n / out)
+  (repeat n (setq out (cons (car lst) out) lst (cdr lst)))
+  (reverse out)
+)
+(defun turn-list-tail (lst n) (repeat n (setq lst (cdr lst))) lst)
+
 ;; Tire loci for one segment: front-left, front-right, rear-left, rear-right.
 (defun turn-tire-loci (segment states / half)
   (setq half (/ (turn-seg-get segment "axle-width") 2.0))
@@ -635,6 +884,49 @@
     (mapcar '(lambda (s) (turn-right (turn-trail s) (turn-heading s) half)) states)
   )
 )
+
+;; Every polygon of one segment's swept ground: the strips swept by its six
+;; edge pieces, its first and last placement, and the strip swept by any axle
+;; whose wheels stand outside the body.
+;;
+;; An axle is an edge like any other - its two wheels are its extremes, by the
+;; same argument - so a protruding axle's strip lies between its two tire
+;; paths. Real axles only: a trailer's guide point is its kingpin or drawbar
+;; eye. An axle within its body adds nothing, and is left out.
+(defun turn-segment-sweep (segment states index / body i lefts loci n out
+                              points rights tolerance)
+  (setq
+    tolerance (* 1e-4 (turn-seg-get segment "body-length"))
+    points (mapcar '(lambda (s) (turn-sweep-points segment s)) states)
+    n (length (car points))
+    i 0
+  )
+  (repeat n
+    (setq
+      out (append out (turn-edge-sweep (turn-column points i)
+                                       (turn-column points (rem (1+ i) n))
+                                       tolerance))
+      i (1+ i)
+    )
+  )
+  (setq
+    body (turn-body-corners segment (car states))
+    out (append out (list body (turn-body-corners segment (last states))))
+    loci (turn-tire-loci segment states)
+  )
+  (if (< 0 index) (setq loci (cddr loci)))
+  (while loci
+    (setq lefts (car loci) rights (cadr loci) loci (cddr loci))
+    (if (or (not (turn-inside-convex-p (car lefts) body tolerance))
+            (not (turn-inside-convex-p (car rights) body tolerance)))
+      (setq out (append out (turn-edge-sweep lefts rights tolerance)))
+    )
+  )
+  out
+)
+
+;; The K-th point of every row.
+(defun turn-column (rows k) (mapcar '(lambda (row) (nth k row)) rows))
 
 ;;; ===========================================================================
 ;;; SECTION 4  THE VEHICLE MODEL
@@ -1122,8 +1414,12 @@
 ;; Everything one segment contributes to the drawing.
 (defun turn-draw-segment (segment states index plot-frequency / corner i loci)
   (setq loci (turn-tire-loci segment states))
-  (turn-draw-pline (nth 0 loci) (turn-layer index "FRNT-LEFT") nil)
-  (turn-draw-pline (nth 1 loci) (turn-layer index "FRNT-RGHT") nil)
+  (if (turn-role-applies-p index "FRNT-LEFT")
+    (progn
+      (turn-draw-pline (nth 0 loci) (turn-layer index "FRNT-LEFT") nil)
+      (turn-draw-pline (nth 1 loci) (turn-layer index "FRNT-RGHT") nil)
+    )
+  )
   (turn-draw-pline (nth 2 loci) (turn-layer index "REAR-LEFT") nil)
   (turn-draw-pline (nth 3 loci) (turn-layer index "REAR-RGHT") nil)
   (if (turn-seg-get segment "hitch")
@@ -1178,18 +1474,12 @@
 ;;; actually puts on a plan sheet: the outer boundary of every square foot the
 ;;; rig touches.
 ;;;
-;;; The boundary of a swept region is a polygon-union problem, and a polygon
-;;; union written in AutoLISP over a few hundred bodies would be too slow to
-;;; use. AutoCAD already has the boolean, in C++, in the REGION and UNION
-;;; commands. So: lay down the body outline at EVERY step (not at the plot
-;;; frequency - the plotted boxes are a sparse illustration, the envelope needs
-;;; the dense sweep), turn them into regions, union them, and reduce the result
-;;; back to polylines.
-;;;
-;;; Consecutive bodies overlap heavily - a step is a fraction of a wheelbase
-;;; and a body is longer than its wheelbase - so the union has no gaps. The
-;;; only error is the chord-versus-arc sagitta between steps, which is the same
-;;; discretisation the tire paths already carry.
+;;; Each segment's swept ground comes from turn-segment-sweep as a few dozen
+;;; polygons whose outer edges ARE the paths of its corners and of its side
+;;; points abeam the trailing axle. The segments overlap one another, and which
+;;; point forms the outside changes along the way, so the polygons are handed to
+;;; AutoCAD's own boolean - REGION and UNION, in C++ - rather than merged in
+;;; AutoLISP. The result is reduced back to polylines.
 
 ;; Every entity created after MARKER, in database order. A marker of nil means
 ;; "everything". Used to find what a command produced without trusting entlast
@@ -1210,10 +1500,27 @@
   ss
 )
 
-;; Returns the swept area, or nil if no envelope was produced.
-;; The shortest body in the rig. The envelope lays each body outline down once
-;; per calculation step, so this is the distance a step must stay under if
-;; consecutive placements are to overlap at all.
+;; One closed outline as a REGION.
+;;
+;; Not the REGION command. Handed a selection, REGION searches every curve in
+;; it for loops it might form with every other, and that search dominated the
+;; whole envelope: 73 of 84 s on a WB-67 at a 0.6 step. Each outline here is
+;; already one closed loop, so it is converted on its own and the search never
+;; happens.
+(defun turn-draw-region (points layer / curve)
+  (turn-draw-pline points layer T)
+  (setq curve (vlax-ename->vla-object (entlast)))
+  (vla-AddRegion
+    (vla-get-ModelSpace (vla-get-ActiveDocument (vlax-get-acad-object)))
+    (vlax-make-variant
+      (vlax-safearray-fill (vlax-make-safearray vlax-vbObject '(0 . 0)) (list curve))
+    )
+  )
+  (vla-Delete curve)
+)
+
+;; The shortest body in the rig. A calculation step as long as a body cannot
+;; describe how that body moves.
 (defun turn-shortest-body (vehicle / len best)
   (foreach segment vehicle
     (setq len (turn-seg-get segment "body-length"))
@@ -1233,12 +1540,10 @@
   best
 )
 
-;; A union of hundreds of overlapping rectangles leaves the odd loop of
-;; essentially no area where two boundaries almost coincide. That is arithmetic
-;; litter, not swept path, and it is indistinguishable from real geometry once
-;; it is sitting on the layer. Anything above the tolerance is left alone: a
-;; genuine hole is the drawing telling the truth about a coarse step, and
-;; deleting it would hide that.
+;; A union of overlapping strips can leave the odd loop of essentially no area
+;; where two boundaries almost coincide. That is arithmetic litter, not swept
+;; path, and it is indistinguishable from real geometry once it is sitting on
+;; the layer. Anything above the tolerance is left alone.
 (defun turn-drop-slivers (entities tolerance / a dropped)
   (setq dropped 0)
   (foreach en entities
@@ -1251,43 +1556,20 @@
   dropped
 )
 
-;; Nothing closes in AutoCAD unless you tell it to. PEDIT Join joins; it does not
-;; close, and there was never any reason to expect it would. So a loop comes back
-;; with its first and last vertices coinciding exactly and its Closed flag off -
-;; measured on Tom's 1284-vertex envelope, end gap 0.000, Closed "no". It looks
-;; shut on screen and is not, and hatching, offset, AREA and any boolean
-;; downstream all refuse it.
-;;
-;; This is the telling, and it is done here rather than with PEDIT Close so the
-;; duplicated last vertex goes too: closing over a coincident pair would leave a
-;; zero-length segment behind, which is its own nuisance downstream.
-;;
-;; A loop whose ends are genuinely apart is left alone and counted. That is
-;; missing geometry rather than a missing flag, and the two want opposite fixes.
-(defun turn-close-loops (entities layer tolerance / closed el gap opened pts)
-  (setq closed 0 opened 0)
+;; How many of ENTITIES are not closed polylines. PEDIT Join closes a loop
+;; whose pieces meet end to end, so an open one has a real gap in it: missing
+;; geometry, reported rather than papered over.
+(defun turn-count-open (entities / unclosed)
+  (setq unclosed 0)
   (foreach en entities
-    (setq
-      el (entget en)
-      pts (mapcar 'cdr (vl-remove-if-not '(lambda (x) (= 10 (car x))) el))
-    )
-    (cond
-      ((< (length pts) 3) nil)
-      ((= 1 (logand 1 (cdr (assoc 70 el)))) nil)   ; already closed
-      ((< (setq gap (distance (car pts) (last pts))) tolerance)
-       (turn-draw-pline (reverse (cdr (reverse pts))) layer T)
-       (entdel en)
-       (setq closed (1+ closed))
-      )
-      (t (setq opened (1+ opened)))
-    )
+    (if (zerop (logand 1 (cdr (assoc 70 (entget en))))) (setq unclosed (1+ unclosed)))
   )
-  (list closed opened)
+  unclosed
 )
 
+;; Returns the swept area, or nil if no envelope was produced.
 (defun turn-draw-envelope (vehicle paths / area clayer index layer loops
-                                marker peditaccept regions segment ss state
-                                kept slivers shut
+                                marker peditaccept unclosed regions segment slivers
                                )
   (turn-make-vehicle-layers)
   (setq
@@ -1302,20 +1584,16 @@
   ;; whole operation.
   (setvar "clayer" layer)
   (foreach segment vehicle
-    (foreach state (nth index paths)
-      (turn-draw-pline (turn-body-corners segment state) layer T)
+    (foreach polygon (turn-segment-sweep segment (nth index paths) index)
+      (turn-draw-region polygon layer)
     )
     (setq index (1+ index))
   )
-  (setq ss (turn-selection (turn-entities-after marker)))
+  (setq regions (turn-entities-after marker))
   (cond
-    ((zerop (sslength ss)) (setvar "clayer" clayer) nil)
+    ((null regions) (setvar "clayer" clayer) nil)
     (t
-     (command "._region" ss "")
-     ;; REGION consumes the polylines, so whatever survives after the marker is
-     ;; the regions it made.
-     (setq regions (turn-entities-after marker))
-     (if (< 1 (length regions))
+     (if (cdr regions)
        (progn
          (command "._union" (turn-selection regions) "")
          (setq regions (turn-entities-after marker))
@@ -1332,7 +1610,9 @@
      ;; LWPOLYLINE is what an engineer offsets, hatches and plots.
      (setq peditaccept (getvar "peditaccept"))
      (setvar "peditaccept" 1)
-     (command "._explode" (turn-selection regions))
+     ;; One at a time. Handed a selection set from LISP, EXPLODE explodes only
+     ;; its first object, which is how 1386 regions once outlived an envelope.
+     (foreach en regions (command "._explode" en))
      (command "._pedit" "_multiple" (turn-selection (turn-entities-after marker)) ""
               "_join" 0.0 ""
      )
@@ -1344,17 +1624,15 @@
        slivers
         (turn-drop-slivers (turn-entities-after marker)
                                 (* 1e-4 (turn-smallest-body-area vehicle)))
-       shut
-        (turn-close-loops (turn-entities-after marker) layer
-                               (* 1e-6 (turn-shortest-body vehicle)))
+       unclosed (turn-count-open (turn-entities-after marker))
        loops (length (turn-entities-after marker))
      )
      (if (< 0 slivers)
        (princ (strcat "\nTURN: discarded " (itoa slivers)
                       " zero-area sliver(s) left by the union."))
      )
-     (if (< 0 (cadr shut))
-       (princ (strcat "\nTURN: " (itoa (cadr shut))
+     (if (< 0 unclosed)
+       (princ (strcat "\nTURN: " (itoa unclosed)
                       " envelope loop(s) did not close. The boundary has a gap in it."))
      )
      (cond
@@ -1390,7 +1668,15 @@
 ;; just does not show you much.
 (setq *turn-short-course* 5.0)
 
-(defun turn-report (vehicle paths area / body findings len radius ratio spacing wheelbase)
+;; How far, in radians, the lead segment starts turned away from the direction
+;; its guide point first travels.
+(defun turn-start-facing (states)
+  (abs (turn-normalize-angle
+         (- (turn-heading (car states))
+            (angle (turn-guide (car states)) (turn-guide (cadr states))))))
+)
+
+(defun turn-report (vehicle paths area / body facing findings len radius ratio spacing wheelbase)
   (setq findings (turn-findings vehicle paths))
   (princ (strcat "\nTURN: " (itoa (length vehicle)) " segment(s), "
                  (itoa (length (car paths))) " steps."))
@@ -1403,10 +1689,8 @@
       (setq ratio (/ len wheelbase))
       (princ (strcat "\nTURN: course " (rtos len 2 1) " long, " (rtos ratio 2 1)
                      " x the rig's " (rtos wheelbase 2 1) " wheelbase."))
-      ;; A step longer than the shortest body means consecutive placements of
-      ;; that body do not overlap, so the swept envelope is guaranteed to come
-      ;; out with gaps in it. That is not a union bug; it is the sampling being
-      ;; coarser than the thing being sampled.
+      ;; A step as long as a body cannot describe how that body moves: the
+      ;; tracking itself is only first-order accurate in the step.
       (if (and (< 1 (length (car paths)))
                (setq body (turn-shortest-body vehicle))
                (> (setq spacing (distance (turn-guide (car (car paths)))
@@ -1415,9 +1699,8 @@
         (princ
           (strcat
             "\n  ! Calculation step " (rtos spacing 2 2) " is longer than the shortest"
-            "\n    body (" (rtos body 2 2) "), so the envelope will have gaps between"
-            "\n    consecutive positions. Re-run with a step well under "
-            (rtos body 2 2) "."
+            "\n    body (" (rtos body 2 2) "). The paths are too coarse to trust."
+            "\n    Re-run with a step well under " (rtos body 2 2) "."
           )
         )
       )
@@ -1435,6 +1718,21 @@
   )
   (if area
     (princ (strcat "\nTURN: swept area is " (rtos area 2 1) " square drawing units."))
+  )
+  ;; TURN takes the starting direction from the vehicle block's rotation. A
+  ;; block turned the wrong way starts the rig facing against its course, and
+  ;; it folds round in the first few steps (Tom's turntest.dwg, 2026-09-26).
+  (if (and (cdr (car paths))
+           (setq facing (turn-start-facing (car paths)))
+           (< (/ pi 2.0) facing))
+    (princ
+      (strcat
+        "\n  ! The vehicle starts facing " (rtos (/ (* facing 180.0) pi) 2 0)
+        " degrees away from the course. TURN takes the starting direction"
+        "\n    from the vehicle block's rotation; check that the block points along"
+        "\n    the course."
+      )
+    )
   )
   (if (setq radius (turn-min-radius (car vehicle)))
     (princ (strcat "\nTURN: tightest turn this vehicle can make is "
@@ -1470,12 +1768,13 @@
 ;; the memory used to beat the computed default unconditionally: a WB-67 whose
 ;; drawing declared inches has a wheelbase of 234, so its default step was 23.4,
 ;; and that 23.4 was then offered for a rig whose own default was 1.2. Pressing
-;; Enter accepted it and the swept envelope came out full of holes, because the
-;; step was longer than the body being swept.
+;; Enter accepted it and the envelope came out full of holes, because the step
+;; was longer than the body being swept. (The envelope is built from traced
+;; point paths now and no longer opens holes, but a step as long as a body is
+;; still far too coarse to track that body with.)
 ;;
-;; So the memory is offered only while it still suits this vehicle. The test is
-;; the one that actually matters: a step at or beyond the shortest body length
-;; guarantees gaps in the envelope.
+;; So the memory is offered only while it still suits this vehicle: shorter
+;; than the shortest body.
 (defun turn-default-step (vehicle / body computed)
   (setq
     computed (/ (turn-seg-get (car vehicle) "wheelbase") 10.0)
@@ -1972,6 +2271,7 @@
 )
 
 (defun c:drive (/ atts en-vehicle heading-0 start step vehicle)
+  (princ "\nDRIVE is experimental and has not yet been tested by hand. Check what it draws.")
   (turn-read-layers-dat)
   (setq en-vehicle (car (entsel "\nSelect vehicle block: ")))
   (cond
@@ -2272,5 +2572,5 @@
 )
 
 
-(princ (strcat "\nTURN " (turn-getvar "general.version") " loaded. Type TURN, DRIVE or BV."))
+(princ (strcat "\nTURN " (turn-getvar "general.version") " loaded. Type TURN or BV."))
 (princ)

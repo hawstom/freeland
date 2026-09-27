@@ -22,8 +22,9 @@
   *turn-test-dir*  (strcat (getenv "TURNDEV") "/")
   ;; Turning_Path_Tracker/ - the trunk: turn.lsp and its two .dat files
   *turn-test-root* (strcat (getenv "TURNDEV") "/../")
-  ;; hawsedc.com/gnu/ - what users actually download
-  *turn-test-gnu*  (strcat (getenv "TURNDEV") "/../hawsedc.com/gnu/")
+  ;; freeland/hawsedc.com/gnu/ - what users actually download. The website
+  ;; clone sits at the freeland root because it serves every FreeLand tool.
+  *turn-test-gnu*  (strcat (getenv "TURNDEV") "/../../hawsedc.com/gnu/")
 )
 
 (defun turn-test-dev (f) (strcat *turn-test-dir* f))

@@ -35,10 +35,11 @@
 ;;; ---------------------------------------------------------------------------
 (defun turn-test-integration-check-segment (index tows-p / role)
   (turn-test-write (strcat "**Segment " (itoa index) " - " (turn-segment-stem index) "**"))
+  ;; A trailer's guide point is a hitch, not wheels: no front tire paths.
   (foreach role '("FRNT-LEFT" "FRNT-RGHT" "REAR-LEFT" "REAR-RGHT")
     (turn-test-equal
-      (strcat "one pline on " (turn-layer index role))
-      1
+      (strcat (if (turn-role-applies-p index role) "one pline" "no pline") " on " (turn-layer index role))
+      (if (turn-role-applies-p index role) 1 0)
       (turn-test-count-on-layer (turn-layer index role))
     )
   )
@@ -271,14 +272,14 @@
 ;; Tom's 2026-09-13 report. A three segment rig plotted on a step of about 23,
 ;; against a tractor body only 20 long, came back as seventeen loops on
 ;; C-TURN-ENVL - one real boundary, fifteen holes, and one loop of area 0.001.
+;; The holes were real under the envelope of that time, which laid the body
+;; down once per step: a step longer than the body left gaps between
+;; placements.
 ;;
-;; The holes are not a union bug. The envelope lays each body outline down once
-;; per calculation step, so a step longer than the body means consecutive
-;; placements never touch and the union honestly has gaps in it. The 0.001 loop
-;; is different: that is arithmetic litter and gets dropped.
-;;
-;; Reproduce both deliberately. The fine-step run above must give exactly one
-;; loop; this coarse-step run must give more, and must not leave slivers.
+;; The envelope is built from traced point paths now (turn-segment-sweep), and
+;; the strip between two consecutive positions of an edge covers the ground
+;; between them however long the step. So the same coarse run must now give ONE
+;; closed loop, and no slivers.
 (defun turn-test-integration-check-coarse-step (en-course vehicle / after before coarse loops)
   (setq before (length (turn-test-integration-layer-entities (turn-layer nil "ENVL"))))
   (turn-test-equal "the fine-step run gave exactly one closed envelope" 1 before)
@@ -290,7 +291,7 @@
     loops (- (length after) before)
   )
   (turn-test-write (strcat "- loops from the coarse run: " (itoa loops)))
-  (turn-test-check "a step longer than the shortest body opens holes" (< 1 loops))
+  (turn-test-equal "a step longer than the shortest body still gives one closed loop" 1 loops)
   ;; PEDIT Join returns loops whose ends coincide but whose Closed flag is off.
   ;; Tom's 1284-vertex envelope measured end gap 0.000 with Closed "no", which
   ;; looks shut and is not: hatching, offset and area all refuse it.

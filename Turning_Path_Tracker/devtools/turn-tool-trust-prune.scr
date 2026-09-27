@@ -1,0 +1,5 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 0)(setvar "filedia" 0)
+(load (turn-test-dev "turn-tool-trust-prune.lsp"))(turn-tool-trust-prune-run (turn-test-dev "turn-tool-trust-prune.md"))
+(turn-test-safe-quit)
+quit

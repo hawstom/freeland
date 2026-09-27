@@ -58,12 +58,15 @@
 ;;; Fixtures
 ;;; ---------------------------------------------------------------------------
 ;; A WB-67-shaped tractor and trailer: 65 ft rig wheelbase, as the punch list
-;; text assumes.
+;; text assumes. turn-segment takes front-hang FORWARD-positive - only block
+;; attributes use the trailer's backward convention - so the 3 ft of deck ahead
+;; of the kingpin is +3.0. (It was -3.0 until 2026-09-26, which put the deck
+;; 3 ft behind the kingpin.)
 (defun turn-test-punch-rig ()
   (list
     (turn-segment "Tractor" 19.5 8.0 27.92 8.0 4.0 0.0
                        (* pi (/ 30.0 180.0)) (* pi (/ 70.0 180.0)))
-    (turn-segment "Trailer" 45.5 8.5 53.0 8.5 -3.0 nil
+    (turn-segment "Trailer" 45.5 8.5 53.0 8.5 3.0 nil
                        0.0 (* pi (/ 70.0 180.0)))
   )
 )
@@ -121,8 +124,10 @@
   (turn-test-check "BUILDVEHICLE is defined" (not (null c:buildvehicle)))
   (turn-test-check "the BV alias is defined" (not (null c:bv)))
   (turn-test-check "DRIVE is defined" (not (null c:drive)))
-  ;; The banner has to name every command, or a user has no way to find one.
-  (turn-test-check "the load banner names TURN, DRIVE and BV"
+  ;; The banner names every released command, or a user has no way to find
+  ;; one. DRIVE is experimental and not yet hand-tested (Tom, 2026-09-26), so
+  ;; it is deliberately left out; name it here when it is released.
+  (turn-test-check "the load banner names TURN and BV, and not the experimental DRIVE"
                    (turn-test-punch-banner-names-commands-p))
 )
 
@@ -132,7 +137,7 @@
   (while (and (not found) (setq line (read-line f)))
     (if (and (vl-string-search "loaded. Type" line)
              (vl-string-search "TURN" line)
-             (vl-string-search "DRIVE" line)
+             (not (vl-string-search "DRIVE" line))
              (vl-string-search "BV" line))
       (setq found T)
     )

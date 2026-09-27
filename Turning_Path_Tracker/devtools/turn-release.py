@@ -6,10 +6,9 @@
 
 Turning_Path_Tracker/turn.lsp is canon. hawsedc.com/gnu/turn-<version>.lsp is a
 release artifact: produced by this script, named by the version inside the file,
-never hand-edited. Before overwriting, this script checks whether the published
-copy differs from the last thing it published, because a difference means
-somebody edited the artifact instead of the trunk -- which is the one failure
-mode the old copy-by-hand ritual could not detect.
+never hand-edited, and never replaced: once turn-<version>.lsp exists, a
+trunk that differs from it must carry a new version number. The data files
+are unversioned and are simply kept in sync.
 
 After publishing, run:  devtools\\turn-tests.bat turn-release-smoke
 """
@@ -22,7 +21,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TRUNK = HERE.parent / "turn.lsp"
-GNU = HERE.parent / "hawsedc.com" / "gnu"
+GNU = HERE.parent.parent / "hawsedc.com" / "gnu"   # freeland/hawsedc.com, shared by every tool
 DATA = ["turn-layers.dat", "turn-vehicles.dat"]
 
 
@@ -65,7 +64,7 @@ def main() -> int:
         sys.exit(f"FATAL: trunk not found: {TRUNK}")
     if not GNU.is_dir():
         sys.exit(f"FATAL: website tree not found: {GNU}\n"
-                 "Clone github.com/hawstom/hawsedc.com into Turning_Path_Tracker/.")
+                 "Clone github.com/hawstom/hawsedc.com into the freeland root.")
 
     version = version_of(TRUNK)
 
@@ -104,6 +103,17 @@ def main() -> int:
             state = "DIFFERS"
             stale.append(dst)
         print(f"  {state:24}  {dst.name}")
+
+    # A released version number names one file, forever. 2.0.0 was republished
+    # with later fixes under the same name and never uploaded, so the website
+    # and the repo each held a different "2.0.0" (found 2026-09-26). A changed
+    # program gets a new version; the data files are unversioned and may change.
+    program = GNU / f"turn-{version}.lsp"
+    if program in stale:
+        print(f"\nREFUSED: {program.name} is already released and the trunk differs from it.")
+        print("A released version is never republished with different contents.")
+        print("Give the trunk a new version number, then publish that.")
+        return 1
 
     if not stale and all(d.exists() for _, d in targets):
         print("\nEverything published and identical. Nothing to do.")

@@ -1,0 +1,7 @@
+(load (strcat (getenv "TURNDEV") "/turn-dev-paths.lsp"))
+(setvar "cmdecho" 0)(setvar "filedia" 0)(setvar "osmode" 0)(setvar "peditaccept" 1)
+(load (turn-test-dev "turn-tests.lsp"))(turn-test-start "Probe: PEDIT Join, then Close")
+(load (turn-test-src "turn.lsp"))(turn-test-capture-alerts)
+(load (turn-test-dev "turn-integration-tests.lsp"))(load (turn-test-dev "turn-envelope-tests.lsp"))(load (turn-test-dev "turn-probe-pedit-close.lsp"))(turn-probe-pc-run)(turn-probe-pc-envelopes)(turn-test-finish nil)
+(turn-test-safe-quit)
+quit
