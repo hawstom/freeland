@@ -7,10 +7,11 @@ in the tool folders — `Turning_Path_Tracker/HANDOFF.md` for TURN and its DRIVE
 ## State
 
 - freeland and the website repo (`hawsedc.com/`, at the freeland root) are committed and
-  pushed. **Pushing does not deploy the site**: the server updates on a `git pull` there.
-  Evidence: the 2026-09-13 zips reached the live site, the later 2.0.0 commits the same
-  day did not. Until Tom pulls on the server, the live site lacks TURN 2.1.0, the TURN page
-  audit and the GPL v3 page changes.
+  pushed, and **production is deployed** (2026-09-27): TURN 2.1.0, the TURN page audit and
+  the GPL v3 page changes are live. Pushing does not deploy; Tom runs `git pull` on the
+  server (`~/addon_html/hawsedc.com`). Production and this clone are both set to
+  `pull.ff only`. Tom sometimes commits on the server (menu, .htaccess, sitemap); he now
+  pushes those straight away, so pull here before starting website work.
 - TURN 2.1.0 is released into `hawsedc.com/gnu/`. DRIVE is in it, experimental and
   unannounced, waiting for Tom to drive it by hand.
 - All suites green on Civil 3D 2026, AutoCAD 2027, AutoCAD 2024.
