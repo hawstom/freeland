@@ -3,6 +3,9 @@
 `CLAUDE.md` holds the durable facts. This file is the perishable part: what just
 happened, and what Tom is about to test.
 
+FreeLand-wide open issues (website, licensing, app stores, profiles) are in the root
+`HANDOFF.md`.
+
 ## State, updated 2026-09-27
 
 **2.1.0 is published into `freeland/hawsedc.com/gnu/` (not yet uploaded) and DRIVE ships

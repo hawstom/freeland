@@ -36,3 +36,6 @@ Turning_Path_Tracker/devtools/turn-scratch.dwg
 *.ac$
 # AutoCAD 2027's crash reporter logs its own start-up into the working directory.
 ErrorReports/
+
+# A backup of AutoCAD profile registry values taken before a cleanup; personal, not source.
+Turning_Path_Tracker/devtools/profile-backup-*.txt
